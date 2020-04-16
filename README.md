@@ -48,6 +48,6 @@ You can run this and pass `--now` to skip the schedule and run the sync immediat
    export SOURCE_DB_PORT='1234'
    export DEST_DB_HOST='127.0.0.1'
    export DEST_DB_PORT='1235'
-   pipenv run main.py --now
+   poetry run python3 main.py --now
    ```
 
