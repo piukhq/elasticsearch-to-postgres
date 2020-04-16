@@ -10,7 +10,7 @@ black:
   stage: tests
   script:
     - pip3 install pipenv
-    - pipenv --dev sync
+    - pipenv sync --dev
     - pipenv run black -l 130 -t py38 --check .
 
 build-develop:

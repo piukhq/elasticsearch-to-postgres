@@ -10,8 +10,5 @@ black = "*"
 psycopg2 = "*"
 apscheduler = "*"
 
-[requires]
-python_version = "3.7"
-
 [pipenv]
 allow_prereleases = true
