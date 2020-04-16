@@ -11,7 +11,7 @@ black:
   script:
     - pip3 install pipenv
     - pipenv sync --dev
-    - pipenv run black -l 130 -t py38 --check .
+    - pipenv run black -l 120 -t py38 --check .
 
 build-develop:
   stage: build
