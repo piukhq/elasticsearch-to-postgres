@@ -1,0 +1,71 @@
+stages:
+  - tests
+  - build
+  - dev
+  - staging
+  - prod
+
+
+black:
+  stage: tests
+  script:
+    - pip3 install pipenv
+    - pipenv --dev sync
+    - pipenv run black -l 130 -t py38 --check .
+
+build-develop:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  script:
+    - docker build --pull -t "$CI_REGISTRY/postges-syncer:latest" .
+    - docker push "$CI_REGISTRY/postges-syncer:latest"
+  only:
+    - master
+
+build-master:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  script:
+    - docker build --pull -t "$CI_REGISTRY/postges-syncer:$CI_COMMIT_TAG" .
+    - docker push "$CI_REGISTRY/postges-syncer:$CI_COMMIT_TAG"
+  only:
+    - tags
+
+tag-develop:
+  stage: dev
+  image: binkops.azurecr.io/tagbot:latest
+  environment:
+    name: dev
+  script:
+    - tagbot --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" --source "$CI_REGISTRY/postges-syncer:latest" --tag "develop-$CI_COMMIT_SHORT_SHA"
+  only:
+    - master
+
+tag-staging:
+  stage: staging
+  image: binkops.azurecr.io/tagbot:latest
+  environment:
+    name: staging
+  script:
+    - tagbot --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" --source "$CI_REGISTRY/postges-syncer:$CI_COMMIT_TAG" --tag "staging-$CI_COMMIT_TAG"
+  only:
+    - tags
+
+tag-prod:
+  stage: prod
+  image: binkops.azurecr.io/tagbot:latest
+  environment:
+    name: prod
+  script:
+    - tagbot --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" --source "$CI_REGISTRY/postges-syncer:$CI_COMMIT_TAG" --tag "prod-$CI_COMMIT_TAG"
+  when: manual
+  only:
+    - tags
