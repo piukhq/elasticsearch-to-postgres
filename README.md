@@ -21,7 +21,7 @@ You can run this and pass `--now` to skip the schedule and run the sync immediat
 
 1. Install dependencies
    ```bash
-   pipenv sync
+   poetry install
    ```
 1. Dump some data from something that looks like one of the databases in question, e.g.
    ```bash

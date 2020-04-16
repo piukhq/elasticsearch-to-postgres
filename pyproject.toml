@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "postgres-syncer"
+version = "0.1.0"
+description = "Syncs postgres db's between servers"
+authors = ["Terry Cain <tcain@bink.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.7"
+psycopg2 = "^2.8.5"
+apscheduler = "^3.6.3"
+
+[tool.poetry.dev-dependencies]
+black = "^19.10b0"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
