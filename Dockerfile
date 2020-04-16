@@ -1,7 +1,9 @@
-FROM python:3.8
+FROM python:3.7
 
 WORKDIR /app
-ADD main.py /app/main.py
+ADD main.py /app
+ADD Pipfile /app
+ADD Pipfile.lock /app
 
 RUN apt update && apt -y install postgresql-client && \
     apt clean && rm -rf /var/lib/apt/lists
