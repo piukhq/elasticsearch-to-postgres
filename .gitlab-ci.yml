@@ -9,6 +9,7 @@ stages:
 black:
   stage: tests
   script:
+    - env
     - pip3 install poetry
     - poetry install
     - poetry run black -l 120 -t py38 --check .
