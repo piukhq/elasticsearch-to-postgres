@@ -15,11 +15,9 @@ black:
 
 build-develop:
   stage: build
-  image: docker:latest
+  image: terrycain/docker-env-creds:latest
   services:
     - docker:dind
-  before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
   script:
     - docker build --pull -t "$CI_REGISTRY/postges-syncer:latest" .
     - docker push "$CI_REGISTRY/postges-syncer:latest"
@@ -28,11 +26,9 @@ build-develop:
 
 build-master:
   stage: build
-  image: docker:latest
+  image: terrycain/docker-env-creds:latest
   services:
     - docker:dind
-  before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
   script:
     - docker build --pull -t "$CI_REGISTRY/postges-syncer:$CI_COMMIT_TAG" .
     - docker push "$CI_REGISTRY/postges-syncer:$CI_COMMIT_TAG"
