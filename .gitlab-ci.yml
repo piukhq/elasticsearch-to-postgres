@@ -16,8 +16,8 @@ build-develop:
   services:
     - docker:dind
   script:
-    - docker build --pull -t "$CI_REGISTRY/postges-syncer:latest" .
-    - docker push "$CI_REGISTRY/postges-syncer:latest"
+    - docker build --pull -t "$CI_REGISTRY/postgres-syncer:latest" .
+    - docker push "$CI_REGISTRY/postgres-syncer:latest"
   only:
     - master
 
