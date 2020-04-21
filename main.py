@@ -20,6 +20,7 @@ SOURCE_DBS = os.environ["SOURCE_DBS"].split(",")
 DEST_DB_HOST = os.environ["DEST_DB_HOST"]
 DEST_DB_PORT = int(os.environ.get("DEST_DB_PORT", "5432"))
 DEST_DB_USER = os.environ.get("DEST_DB_USER", "postgres")
+DEST_DB_PASSWORD = os.environ.get("DEST_DB_PASSWORD")
 
 DB_SYNC_TIMEOUT = int(os.environ.get("DB_SYNC_TIMEOUT", "3600"))
 ACCEPTABLE_DB_REGEX = re.compile(r"[a-z]+")
@@ -117,11 +118,15 @@ def main() -> None:
             print(f"DB {db} not an acceptable db name")
             sys.exit(1)
 
+    if DEST_DB_PASSWORD:
+        with open(os.path.expanduser("~/.pgpass"), "w") as fp:
+            fp.write(f"{DEST_DB_HOST}:{DEST_DB_PORT}:*:{DEST_DB_USER}:{DEST_DB_PASSWORD}\n")
+
     if args.now:
         dump_tables()
     else:
         scheduler = BlockingScheduler()
-        scheduler.add_job(lambda _: dump_tables(), args=["hourly"], trigger=CronTrigger.from_crontab("0 2 * * *"))
+        scheduler.add_job(dump_tables, trigger=CronTrigger.from_crontab("0 2 * * *"))
         scheduler.start()
 
 
