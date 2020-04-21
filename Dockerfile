@@ -7,6 +7,8 @@ ADD poetry.lock /app
 RUN apt update && apt -y install postgresql-client && \
     apt clean && rm -rf /var/lib/apt/lists
 
-RUN pip --no-cache-dir install poetry && poetry install --no-root --no-dev
+RUN pip --no-cache-dir install poetry && \
+    poetry config virtualenvs.create false && \
+    poetry install --no-root --no-dev
 
 CMD ["python", "main.py"]
