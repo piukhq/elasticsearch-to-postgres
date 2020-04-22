@@ -26,7 +26,7 @@ DEST_DB_PORT = int(os.environ.get("DEST_DB_PORT", "5432"))
 DEST_DB_USER = os.environ.get("DEST_DB_USER", "postgres")
 DEST_DB_PASSWORD = os.environ.get("DEST_DB_PASSWORD")
 
-LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 DB_SYNC_TIMEOUT = int(os.environ.get("DB_SYNC_TIMEOUT", "3600"))
 ACCEPTABLE_DB_REGEX = re.compile(r"[a-z]+")
 
@@ -39,7 +39,7 @@ DROP_DB_SQL = """DROP DATABASE IF EXISTS {0};"""
 CREATE_DB_SQL = """CREATE DATABASE {0};"""
 
 
-logger = cast(pylogrus.PyLogrus, logging.getLogger('postgres-syncer'))
+logger = cast(pylogrus.PyLogrus, logging.getLogger("postgres-syncer"))
 
 
 def kick_users(cursor) -> None:
@@ -53,14 +53,14 @@ def kick_users(cursor) -> None:
 
 
 def drop_create_db(cursor, dbname: str) -> None:
-    logger.withFields({'dbname': dbname}).info("Dropping and creating database")
+    logger.withFields({"dbname": dbname}).info("Dropping and creating database")
     cursor.execute(DROP_DB_SQL.format(dbname))
     cursor.execute(CREATE_DB_SQL.format(dbname))
-    logger.withFields({'dbname': dbname}).info(f"Dropped and created database")
+    logger.withFields({"dbname": dbname}).info(f"Dropped and created database")
 
 
 def sync_data(dbname: str, timeout: int = DB_SYNC_TIMEOUT) -> None:
-    logger.withFields({'dbname': dbname}).info("Starting database sync")
+    logger.withFields({"dbname": dbname}).info("Starting database sync")
     p1 = subprocess.Popen(
         (
             "pg_dump",
@@ -82,11 +82,11 @@ def sync_data(dbname: str, timeout: int = DB_SYNC_TIMEOUT) -> None:
     try:
         ret_code = p2.wait(timeout)
         if ret_code == 0:
-            logger.withFields({'dbname': dbname}).info("Finished database sync")
+            logger.withFields({"dbname": dbname}).info("Finished database sync")
         else:
-            logger.withFields({'dbname': dbname}).error("Failed database sync")
+            logger.withFields({"dbname": dbname}).error("Failed database sync")
     except subprocess.TimeoutExpired:
-        logger.withFields({'dbname': dbname}).error("Database sync timed out")
+        logger.withFields({"dbname": dbname}).error("Database sync timed out")
         p2.terminate()
         try:
             p2.wait(2)
@@ -112,14 +112,14 @@ def dump_tables() -> None:
 
 def main() -> None:
     logger.setLevel(LOG_LEVEL)
-    formatter = pylogrus.TextFormatter(datefmt='Z', colorize=False)
+    formatter = pylogrus.TextFormatter(datefmt="Z", colorize=False)
     # formatter = pylogrus.JsonFormatter()  # Can switch to json if needed
     ch = logging.StreamHandler()
     ch.setLevel(LOG_LEVEL)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    logger.info('Started postgres syncer')
+    logger.info("Started postgres syncer")
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--now", action="store_true", help="Run database sync now")
@@ -133,7 +133,7 @@ def main() -> None:
         sys.exit(1)
     for db in SOURCE_DBS:
         if not ACCEPTABLE_DB_REGEX.match(db):
-            logger.withFields({'dbname': db}).critical(f"DB not an acceptable db name")
+            logger.withFields({"dbname": db}).critical(f"DB not an acceptable db name")
             sys.exit(1)
 
     if DEST_DB_PASSWORD:
@@ -142,8 +142,10 @@ def main() -> None:
             fp.write(f"{DEST_DB_HOST}:{DEST_DB_PORT}:*:{DEST_DB_USER}:{DEST_DB_PASSWORD}\n")
         os.chmod(filename, 0o0600)
 
-    logger.withFields({'host': SOURCE_DB_HOST, 'port': SOURCE_DB_PORT, 'user': SOURCE_DB_USER, 'databases': SOURCE_DBS}).info('Source DB Info')
-    logger.withFields({'host': DEST_DB_HOST, 'port': DEST_DB_PORT, 'user': DEST_DB_USER}).info('Destination DB Info')
+    logger.withFields(
+        {"host": SOURCE_DB_HOST, "port": SOURCE_DB_PORT, "user": SOURCE_DB_USER, "databases": SOURCE_DBS}
+    ).info("Source DB Info")
+    logger.withFields({"host": DEST_DB_HOST, "port": DEST_DB_PORT, "user": DEST_DB_USER}).info("Destination DB Info")
 
     if args.now:
         dump_tables()
