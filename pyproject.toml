@@ -8,6 +8,7 @@ authors = ["Terry Cain <tcain@bink.com>"]
 python = ">=3.7"
 psycopg2 = "^2.8.5"
 apscheduler = "^3.6.3"
+pylogrus = "^0.4.0"
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"

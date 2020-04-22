@@ -93,6 +93,20 @@ version = "2.8.5"
 
 [[package]]
 category = "main"
+description = "PyLogrus is a structured logger for Python"
+name = "pylogrus"
+optional = false
+python-versions = "*"
+version = "0.4.0"
+
+[package.dependencies]
+six = ">=1.10"
+
+[package.extras]
+test = ["coverage", "flake8", "pep8"]
+
+[[package]]
+category = "main"
 description = "World timezone definitions, modern and historical"
 name = "pytz"
 optional = false
@@ -143,7 +157,7 @@ version = "2.0.0"
 pytz = "*"
 
 [metadata]
-content-hash = "6c7ffce29593753440eec8808a033439df9422660d02c290900fe8d1129f4896"
+content-hash = "1c10623fe5a74d53668294a8fb5a3c84b252a7b6ec3bafee14c398c869ab1f68"
 python-versions = ">=3.7"
 
 [metadata.files]
@@ -185,6 +199,10 @@ psycopg2 = [
     {file = "psycopg2-2.8.5-cp38-cp38-win32.whl", hash = "sha256:2327bf42c1744a434ed8ed0bbaa9168cac7ee5a22a9001f6fc85c33b8a4a14b7"},
     {file = "psycopg2-2.8.5-cp38-cp38-win_amd64.whl", hash = "sha256:132efc7ee46a763e68a815f4d26223d9c679953cd190f1f218187cb60decf535"},
     {file = "psycopg2-2.8.5.tar.gz", hash = "sha256:f7d46240f7a1ae1dd95aab38bd74f7428d46531f69219954266d669da60c0818"},
+]
+pylogrus = [
+    {file = "pylogrus-0.4.0-py2.py3-none-any.whl", hash = "sha256:4458910a5da8f313a6ff1e09dace69a93147736caad31724dbb9ff464369ea3b"},
+    {file = "pylogrus-0.4.0.tar.gz", hash = "sha256:13db3a7b28f185d6b0b703be6c71fc612c271da92eb49753ab487dcf56299358"},
 ]
 pytz = [
     {file = "pytz-2019.3-py2.py3-none-any.whl", hash = "sha256:1c557d7d0e871de1f5ccd5833f60fb2550652da6be2693c1e02300743d21500d"},

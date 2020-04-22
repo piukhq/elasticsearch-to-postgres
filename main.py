@@ -4,14 +4,18 @@ Syncs databases from one postgres to another
 """
 import argparse
 import os
+import logging
 import re
 import subprocess
 import sys
+from typing import cast
 
 import psycopg2
+import pylogrus
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers.blocking import BlockingScheduler
 
+logging.setLoggerClass(pylogrus.PyLogrus)
 
 SOURCE_DB_HOST = os.environ["SOURCE_DB_HOST"]
 SOURCE_DB_PORT = int(os.environ.get("SOURCE_DB_PORT", "5432"))
@@ -22,6 +26,7 @@ DEST_DB_PORT = int(os.environ.get("DEST_DB_PORT", "5432"))
 DEST_DB_USER = os.environ.get("DEST_DB_USER", "postgres")
 DEST_DB_PASSWORD = os.environ.get("DEST_DB_PASSWORD")
 
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 DB_SYNC_TIMEOUT = int(os.environ.get("DB_SYNC_TIMEOUT", "3600"))
 ACCEPTABLE_DB_REGEX = re.compile(r"[a-z]+")
 
@@ -34,25 +39,28 @@ DROP_DB_SQL = """DROP DATABASE IF EXISTS {0};"""
 CREATE_DB_SQL = """CREATE DATABASE {0};"""
 
 
+logger = cast(pylogrus.PyLogrus, logging.getLogger('postgres-syncer'))
+
+
 def kick_users(cursor) -> None:
-    print("Kicking any active users")
+    logger.info("Kicking any active users")
     # Dodgy in clause, should really use sqlalchmey
     databases = ",".join([f"'{x}'" for x in SOURCE_DBS])
     sql = KILL_CONN_SQL.format(databases)
-    print(sql)
+    # print(sql)
     cursor.execute(sql)
-    print("Kicked users")
+    logger.info("Kicked users")
 
 
 def drop_create_db(cursor, dbname: str) -> None:
-    print(f"Dropping and creating {dbname}")
+    logger.withFields({'dbname': dbname}).info("Dropping and creating database")
     cursor.execute(DROP_DB_SQL.format(dbname))
     cursor.execute(CREATE_DB_SQL.format(dbname))
-    print(f"Dropped and created {dbname}")
+    logger.withFields({'dbname': dbname}).info(f"Dropped and created database")
 
 
 def sync_data(dbname: str, timeout: int = DB_SYNC_TIMEOUT) -> None:
-    print(f"Syncing {dbname}")
+    logger.withFields({'dbname': dbname}).info("Starting database sync")
     p1 = subprocess.Popen(
         (
             "pg_dump",
@@ -74,11 +82,11 @@ def sync_data(dbname: str, timeout: int = DB_SYNC_TIMEOUT) -> None:
     try:
         ret_code = p2.wait(timeout)
         if ret_code == 0:
-            print(f"Successfully synced {dbname}")
+            logger.withFields({'dbname': dbname}).info("Finished database sync")
         else:
-            print(f"Failed to sync {dbname}")
+            logger.withFields({'dbname': dbname}).error("Failed database sync")
     except subprocess.TimeoutExpired:
-        print(f"{dbname} sync timed out")
+        logger.withFields({'dbname': dbname}).error("Database sync timed out")
         p2.terminate()
         try:
             p2.wait(2)
@@ -87,9 +95,9 @@ def sync_data(dbname: str, timeout: int = DB_SYNC_TIMEOUT) -> None:
 
 
 def dump_tables() -> None:
-    print("Syncing databases")
+    logger.info("Syncing databases")
 
-    with psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} port={DEST_DB_PORT}") as conn:
+    with psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=postgres port={DEST_DB_PORT}") as conn:
         conn.autocommit = True
 
         with conn.cursor() as cur:
@@ -99,23 +107,33 @@ def dump_tables() -> None:
                 drop_create_db(cur, db)
                 sync_data(db)
 
-    print("Finished syncing databases")
+    logger.info("Finished syncing databases")
 
 
 def main() -> None:
+    logger.setLevel(LOG_LEVEL)
+    formatter = pylogrus.TextFormatter(datefmt='Z', colorize=False)
+    # formatter = pylogrus.JsonFormatter()  # Can switch to json if needed
+    ch = logging.StreamHandler()
+    ch.setLevel(LOG_LEVEL)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    logger.info('Started postgres syncer')
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--now", action="store_true", help="Run database sync now")
     args = parser.parse_args()
 
     if SOURCE_DB_HOST == DEST_DB_HOST and SOURCE_DB_PORT == DEST_DB_PORT:
-        print("Cant sync data to the same place")
+        logger.critical("Cant sync data to the same place")
         sys.exit(1)
     if SOURCE_DBS == [""]:
-        print("DBs must be provided")
+        logger.critical("DBs must be provided")
         sys.exit(1)
     for db in SOURCE_DBS:
         if not ACCEPTABLE_DB_REGEX.match(db):
-            print(f"DB {db} not an acceptable db name")
+            logger.withFields({'dbname': db}).critical(f"DB not an acceptable db name")
             sys.exit(1)
 
     if DEST_DB_PASSWORD:
@@ -123,6 +141,9 @@ def main() -> None:
         with open(filename, "w") as fp:
             fp.write(f"{DEST_DB_HOST}:{DEST_DB_PORT}:*:{DEST_DB_USER}:{DEST_DB_PASSWORD}\n")
         os.chmod(filename, 0o0600)
+
+    logger.withFields({'host': SOURCE_DB_HOST, 'port': SOURCE_DB_PORT, 'user': SOURCE_DB_USER, 'databases': SOURCE_DBS}).info('Source DB Info')
+    logger.withFields({'host': DEST_DB_HOST, 'port': DEST_DB_PORT, 'user': DEST_DB_USER}).info('Destination DB Info')
 
     if args.now:
         dump_tables()
