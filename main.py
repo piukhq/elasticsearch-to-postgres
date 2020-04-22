@@ -119,8 +119,10 @@ def main() -> None:
             sys.exit(1)
 
     if DEST_DB_PASSWORD:
-        with open(os.path.expanduser("~/.pgpass"), "w") as fp:
+        filename = os.path.expanduser("~/.pgpass")
+        with open(filename, "w") as fp:
             fp.write(f"{DEST_DB_HOST}:{DEST_DB_PORT}:*:{DEST_DB_USER}:{DEST_DB_PASSWORD}\n")
+        os.chmod(filename, 0o0600)
 
     if args.now:
         dump_tables()
