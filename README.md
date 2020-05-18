@@ -4,6 +4,8 @@ Sync's one or more postgres databases between two database servers using `pg_dum
 
 You can run this and pass `--now` to skip the schedule and run the sync immediately.
 
+This repo also contains the script to copy availability info into Tableau.
+
 ## Env vars:
 
 | Name              | Required | Default  | Type   | Description                                                          |

@@ -5,10 +5,12 @@ description = "Syncs postgres db's between servers"
 authors = ["Terry Cain <tcain@bink.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.7"
+python = "=3.8"
 psycopg2 = "^2.8.5"
 apscheduler = "^3.6.3"
 pylogrus = "^0.4.0"
+elasticsearch = "^7.7.0"
+sqlalchemy = {extras = ["psycopg2"], version = "^1.3.17"}
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"
