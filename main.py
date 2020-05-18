@@ -28,7 +28,7 @@ SOURCE_DBS = os.environ["SOURCE_DBS"].split(",")
 DEST_DB_HOST = os.environ["DEST_DB_HOST"]
 DEST_DB_PORT = int(os.environ.get("DEST_DB_PORT", "5432"))
 DEST_DB_USER = os.environ.get("DEST_DB_USER", "postgres")
-DEST_DB_PASSWORD = os.environ.get("DEST_DB_PASSWORD")
+DEST_DB_PASSWORD = os.environ.get("DEST_DB_PASSWORD").strip()
 ES_HOST = os.environ.get("ES_HOST", "elasticsearch.uksouth.bink.sh")
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
