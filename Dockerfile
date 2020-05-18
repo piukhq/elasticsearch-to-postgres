@@ -3,6 +3,7 @@ WORKDIR /app
 ADD main.py /app
 ADD pyproject.toml /app
 ADD poetry.lock /app
+ADD es_cacert.pem /app
 
 RUN apt update && apt -y install postgresql-client && \
     apt clean && rm -rf /var/lib/apt/lists
