@@ -5,6 +5,7 @@ stages:
 
 black:
   stage: tests
+  image: python:3.8
   script:
     - pip3 install poetry
     - poetry install
@@ -12,9 +13,11 @@ black:
 
 build-develop:
   stage: build
-  image: terrycain/docker-env-creds:latest
+  image: docker:latest
   services:
     - docker:dind
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
   script:
     - docker build --pull -t "$CI_REGISTRY/postgres-syncer:latest" .
     - docker push "$CI_REGISTRY/postgres-syncer:latest"
