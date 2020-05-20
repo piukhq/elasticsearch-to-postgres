@@ -163,17 +163,22 @@ def dump_es_api_stats() -> None:
             },
             "aggs": {
                 "by_uri": {
-                    "terms": {"field": "nginx.uri.keyword"},
+                    "terms": {"field": "nginx.path.keyword"},
                     "aggs": {
-                        "" "stats_response_time": {"stats": {"field": "nginx.upstream_response_time"}},
-                        "percentile_response_time": {
-                            "percentiles": {"field": "nginx.upstream_response_time", "percents": [95, 99]}
-                        },
-                        "response_distribution": {"terms": {"field": "nginx.response.keyword"}},
-                        "availability_date_histogram": {
-                            "date_histogram": {"field": "@timestamp", "fixed_interval": "1m"},
-                            "aggs": {"response_count": {"terms": {"field": "nginx.response.keyword"}}},
-                        },
+                        "by_method": {
+                            "terms": {"field": "nginx.method.keyword"},
+                            "aggs": {
+                                "stats_response_time": {"stats": {"field": "nginx.upstream_response_time"}},
+                                "percentile_response_time": {
+                                    "percentiles": {"field": "nginx.upstream_response_time", "percents": [95, 99]}
+                                },
+                                "response_distribution": {"terms": {"field": "nginx.response.keyword"}},
+                                "availability_date_histogram": {
+                                    "date_histogram": {"field": "@timestamp", "fixed_interval": "1m"},
+                                    "aggs": {"response_count": {"terms": {"field": "nginx.response.keyword"}}},
+                                },
+                            },
+                        }
                     },
                 }
             },
@@ -203,19 +208,25 @@ def dump_es_api_stats() -> None:
     result = []
     aggs = data["aggregations"]["by_uri"]["buckets"]
     for uri_bucket in aggs:
-        result.append(
-            {
-                "url": uri_bucket["key"],
-                "total_hits": uri_bucket["doc_count"],
-                "max_response_time": uri_bucket["stats_response_time"]["max"],
-                "min_response_time": uri_bucket["stats_response_time"]["min"],
-                "sum_response_time": uri_bucket["stats_response_time"]["sum"],
-                "avg_response_time": uri_bucket["stats_response_time"]["sum"] / uri_bucket["doc_count"],
-                "95_response_time": uri_bucket["percentile_response_time"]["values"]["95.0"],
-                "99_response_time": uri_bucket["percentile_response_time"]["values"]["99.0"],
-                "availability": window_response_agg(uri_bucket["availability_date_histogram"]["buckets"]),
-            }
-        )
+        url = uri_bucket["key"]
+        for method_bucket in uri_bucket["aggregations"]["by_method"]["buckets"]:
+            method = method_bucket["key"]
+
+            result.append(
+                {
+                    "key": f"{method}_{url}",
+                    "url": url,
+                    "method": method,
+                    "total_hits": method_bucket["doc_count"],
+                    "max_response_time": method_bucket["stats_response_time"]["max"],
+                    "min_response_time": method_bucket["stats_response_time"]["min"],
+                    "sum_response_time": method_bucket["stats_response_time"]["sum"],
+                    "avg_response_time": method_bucket["stats_response_time"]["sum"] / method_bucket["doc_count"],
+                    "95_response_time": method_bucket["percentile_response_time"]["values"]["95.0"],
+                    "99_response_time": method_bucket["percentile_response_time"]["values"]["99.0"],
+                    "availability": window_response_agg(method_bucket["availability_date_histogram"]["buckets"]),
+                }
+            )
 
     # Attempt to make tabes
     logger.info("Connecting to api stats db")
