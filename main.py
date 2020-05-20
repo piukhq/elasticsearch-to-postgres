@@ -209,7 +209,7 @@ def dump_es_api_stats() -> None:
     aggs = data["aggregations"]["by_uri"]["buckets"]
     for uri_bucket in aggs:
         url = uri_bucket["key"]
-        for method_bucket in uri_bucket["aggregations"]["by_method"]["buckets"]:
+        for method_bucket in uri_bucket["by_method"]["buckets"]:
             method = method_bucket["key"]
 
             result.append(
