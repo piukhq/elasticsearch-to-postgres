@@ -133,7 +133,7 @@ def dump_es_api_stats() -> None:
     now = datetime.datetime.utcnow()
     yesterday = (now - datetime.timedelta(days=1)).date()
 
-    kube_cluster = "sandbox.uksouth.bink.sh"
+    kube_cluster = "prod.k8s.uksouth.bink.sh"
     start_date = yesterday.strftime("%Y-%m-%dT00:00:00.000Z")
     end_date = now.strftime("%Y-%m-%dT00:00:00.000Z")
 
