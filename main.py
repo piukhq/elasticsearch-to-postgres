@@ -51,6 +51,7 @@ logger = cast(pylogrus.PyLogrus, logging.getLogger("postgres-syncer"))
 dest_db_apistats = create_engine(f"postgres://{DEST_DB_USER}:{DEST_DB_PASSWORD}@{DEST_DB_HOST}:{DEST_DB_PORT}/apistats")
 meta = MetaData(dest_db_apistats)
 stats_table = Table("api_stats", meta, Column("date", Date, primary_key=True), Column("api_data", JSON))
+dd_stats_table = Table("dd_api_stats", meta, Column("date", Date, primary_key=True), Column("api_data", JSON))
 
 
 def kick_users(cursor) -> None:
@@ -119,6 +120,51 @@ def dump_tables() -> None:
                 sync_data(db)
 
     logger.info("Finished syncing databases")
+
+
+def dump_dd_stats() -> None:
+    es = elasticsearch.Elasticsearch(["starbug-elasticsearch"])
+
+    now = datetime.datetime.utcnow()
+    yesterday = (now - datetime.timedelta(days=1)).date()
+
+    start_date = yesterday.strftime("%Y-%m-%dT00:00:00.000Z")
+    end_date = now.strftime("%Y-%m-%dT00:00:00.000Z")
+
+    data = es.search(
+        index="synthetics",
+        body={
+            "size": 0,
+            "query": {
+                "bool": {
+                    "must": {"wildcard": {"error": {"value": "*"}}},
+                    "filter": {
+                        "range": {
+                            "timestamp": {"gte": start_date, "lt": end_date, "format": "strict_date_optional_time"}
+                        }
+                    },
+                }
+            },
+            "aggs": {"by_uri": {"terms": {"field": "url.keyword"}}},
+        },
+    )
+
+    # So 1 dd metric per minute
+    # (dd error count / 1440) * 100 = availabiltity
+
+    result = []
+    for bucket in data["aggregations"]["by_uri"]["buckets"]:
+        result.append({"url": bucket["key"], "availability": (bucket["doc_count"] / 1440) * 100})
+
+    # Attempt to make tabes
+    logger.info("Connecting to dd stats db")
+    with dest_db_apistats.connect() as conn:
+        logger.info("Creating tables")
+        meta.create_all()
+        logger.info("Insterting results")
+        stmt = dd_stats_table.insert().values(date=yesterday, api_data=result)
+        conn.execute(stmt)
+        logger.info("Insterted results")
 
 
 def dump_es_api_stats() -> None:
@@ -253,6 +299,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--now", action="store_true", help="Run database sync now")
     parser.add_argument("--es", action="store_true", help="Run elasticsearch dump now")
+    parser.add_argument("--es-dd", action="store_true", help="Run elasticsearch dump now")
     args = parser.parse_args()
 
     if SOURCE_DB_HOST == DEST_DB_HOST and SOURCE_DB_PORT == DEST_DB_PORT:
@@ -281,10 +328,13 @@ def main() -> None:
         dump_tables()
     elif args.es:
         dump_es_api_stats()
+    elif args.es_dd:
+        dump_dd_stats()
     else:
         scheduler = BlockingScheduler()
         scheduler.add_job(dump_tables, trigger=CronTrigger.from_crontab("0 2 * * *"))
         scheduler.add_job(dump_es_api_stats, trigger=CronTrigger.from_crontab("0 1 * * *"))
+        scheduler.add_job(dump_es_api_stats, trigger=CronTrigger.from_crontab("5 1 * * *"))
         scheduler.start()
 
 
