@@ -234,18 +234,24 @@ def dump_es_api_stats() -> None:
         for item in index_scan:
             data = item["_source"]
 
-            result = {
-                "id": item["_id"],
-                "date": yesterday,
-                "method": data["nginx"]["method"],
-                "host": data["nginx"]["vhost"],
-                "path": data["nginx"]["path"],
-                "status": data["nginx"]["staus"],
-                "response_time": data["nginx"]["upstream_response_time"],
-            }
+            try:
+                result = {
+                    "id": item["_id"],
+                    "date": yesterday,
+                    "method": data["nginx"]["method"],
+                    "host": data["nginx"]["vhost"],
+                    "path": data["nginx"]["path"],
+                    "status": data["nginx"]["staus"],
+                    "response_time": data["nginx"]["upstream_response_time"],
+                }
+            except KeyError:
+                continue
 
             stmt = stats_table.insert().values(**result)
-            conn.execute(stmt)
+            try:
+                conn.execute(stmt)
+            except Exception:
+                pass
             counter += 1
 
             if counter % 1000 == 0:
