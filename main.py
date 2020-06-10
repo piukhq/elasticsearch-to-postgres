@@ -241,10 +241,10 @@ def dump_es_api_stats() -> None:
                     "method": data["nginx"]["method"],
                     "host": data["nginx"]["vhost"],
                     "path": data["nginx"]["path"],
-                    "status": data["nginx"]["staus"],
+                    "status": data["nginx"]["status"],
                     "response_time": data["nginx"]["upstream_response_time"],
                 }
-            except KeyError:
+            except Exception:
                 continue
 
             stmt = stats_table.insert().values(**result)
@@ -254,7 +254,7 @@ def dump_es_api_stats() -> None:
                 pass
             counter += 1
 
-            if counter % 1000 == 0:
+            if counter % 100 == 0:
                 logger.info(f"Inserted {counter} values")
 
         logger.info("Insterted results")
