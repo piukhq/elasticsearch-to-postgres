@@ -15,7 +15,8 @@ from typing import cast, List, Dict, Any
 import elasticsearch
 import psycopg2
 import pylogrus
-from sqlalchemy import create_engine, Table, Column, String, MetaData, Date, JSON
+import elasticsearch.helpers
+from sqlalchemy import create_engine, Table, Column, String, MetaData, Date, JSON, Integer, Float
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers.blocking import BlockingScheduler
 
@@ -50,7 +51,17 @@ logger = cast(pylogrus.PyLogrus, logging.getLogger("postgres-syncer"))
 
 dest_db_apistats = create_engine(f"postgres://{DEST_DB_USER}:{DEST_DB_PASSWORD}@{DEST_DB_HOST}:{DEST_DB_PORT}/apistats")
 meta = MetaData(dest_db_apistats)
-stats_table = Table("api_stats", meta, Column("date", Date, primary_key=True), Column("api_data", JSON))
+stats_table = Table(
+    "api_stats_v2",
+    meta,
+    Column("id", String, primary_key=True),
+    Column("date", Date),
+    Column("method", String),
+    Column("host", String),
+    Column("path", String),
+    Column("status", Integer),
+    Column("response_time", Float),
+)
 dd_stats_table = Table("dd_api_stats", meta, Column("date", Date, primary_key=True), Column("api_data", JSON))
 
 
@@ -183,17 +194,19 @@ def dump_es_api_stats() -> None:
     start_date = yesterday.strftime("%Y-%m-%dT00:00:00.000Z")
     end_date = now.strftime("%Y-%m-%dT00:00:00.000Z")
 
-    data = es.search(
-        index="nginx-*",
-        body={
-            "size": 0,
+    index_scan = elasticsearch.helpers.scan(
+        es,
+        {
             "query": {
                 "bool": {
                     "must": [],
                     "filter": [
                         {
                             "bool": {
-                                "should": [{"match": {"kubernetes.cluster": kube_cluster}}],
+                                "should": [
+                                    {"match": {"kubernetes.cluster": kube_cluster}},
+                                    {"match": {"nginx.http_user_agent": "Java"}},
+                                ],
                                 "minimum_should_match": 1,
                             }
                         },
@@ -206,73 +219,9 @@ def dump_es_api_stats() -> None:
                     "should": [],
                     "must_not": [],
                 }
-            },
-            "aggs": {
-                "by_uri": {
-                    "terms": {"field": "nginx.path.keyword"},
-                    "aggs": {
-                        "by_method": {
-                            "terms": {"field": "nginx.method.keyword"},
-                            "aggs": {
-                                "stats_response_time": {"stats": {"field": "nginx.upstream_response_time"}},
-                                "percentile_response_time": {
-                                    "percentiles": {"field": "nginx.upstream_response_time", "percents": [95, 99]}
-                                },
-                                "response_distribution": {"terms": {"field": "nginx.response.keyword"}},
-                                "availability_date_histogram": {
-                                    "date_histogram": {"field": "@timestamp", "fixed_interval": "1m"},
-                                    "aggs": {"response_count": {"terms": {"field": "nginx.response.keyword"}}},
-                                },
-                            },
-                        }
-                    },
-                }
-            },
+            }
         },
     )
-
-    def get_500_count(buckets: List[Dict[str, Any]]) -> int:
-        other = 0
-        _5xx_count = 0
-        for item in buckets:
-            if item["key"].startswith("5"):
-                _5xx_count += item["doc_count"]
-            else:
-                other += item["doc_count"]
-        # If we have valid results getting returned in this 1m bucket, then the api is working
-        return 0 if other else _5xx_count
-
-    def window_response_agg(buckets: List[Dict[str, Any]]) -> float:
-        total = len(buckets)
-        items = [get_500_count(item["response_count"]["buckets"]) for item in buckets]
-
-        # Any 5minute sliding window with
-        sla_breach = [int(all(items[i : i + 5])) for i in range(0, total - 5)]
-        availability = (((total - 5) - sum(sla_breach)) / (total - 5)) * 100
-        return availability
-
-    result = []
-    aggs = data["aggregations"]["by_uri"]["buckets"]
-    for uri_bucket in aggs:
-        url = uri_bucket["key"]
-        for method_bucket in uri_bucket["by_method"]["buckets"]:
-            method = method_bucket["key"]
-
-            result.append(
-                {
-                    "key": f"{method}_{url}",
-                    "url": url,
-                    "method": method,
-                    "total_hits": method_bucket["doc_count"],
-                    "max_response_time": method_bucket["stats_response_time"]["max"],
-                    "min_response_time": method_bucket["stats_response_time"]["min"],
-                    "sum_response_time": method_bucket["stats_response_time"]["sum"],
-                    "avg_response_time": method_bucket["stats_response_time"]["sum"] / method_bucket["doc_count"],
-                    "95_response_time": method_bucket["percentile_response_time"]["values"]["95.0"],
-                    "99_response_time": method_bucket["percentile_response_time"]["values"]["99.0"],
-                    "availability": window_response_agg(method_bucket["availability_date_histogram"]["buckets"]),
-                }
-            )
 
     # Attempt to make tabes
     logger.info("Connecting to api stats db")
@@ -280,8 +229,28 @@ def dump_es_api_stats() -> None:
         logger.info("Creating tables")
         meta.create_all()
         logger.info("Insterting results")
-        stmt = stats_table.insert().values(date=yesterday, api_data=result)
-        conn.execute(stmt)
+
+        counter = 0
+        for item in index_scan:
+            data = item["_source"]
+
+            result = {
+                "id": item["_id"],
+                "date": yesterday,
+                "method": data["nginx"]["method"],
+                "host": data["nginx"]["vhost"],
+                "path": data["nginx"]["path"],
+                "status": data["nginx"]["staus"],
+                "response_time": data["nginx"]["upstream_response_time"],
+            }
+
+            stmt = stats_table.insert().values(**result)
+            conn.execute(stmt)
+            counter += 1
+
+            if counter % 1000 == 0:
+                logger.info(f"Inserted {counter} values")
+
         logger.info("Insterted results")
 
 
@@ -334,7 +303,7 @@ def main() -> None:
         scheduler = BlockingScheduler()
         scheduler.add_job(dump_tables, trigger=CronTrigger.from_crontab("0 2 * * *"))
         scheduler.add_job(dump_es_api_stats, trigger=CronTrigger.from_crontab("0 1 * * *"))
-        scheduler.add_job(dump_es_api_stats, trigger=CronTrigger.from_crontab("5 1 * * *"))
+        scheduler.add_job(dump_dd_stats, trigger=CronTrigger.from_crontab("5 1 * * *"))
         scheduler.start()
 
 
