@@ -196,7 +196,8 @@ def dump_es_api_stats() -> None:
 
     index_scan = elasticsearch.helpers.scan(
         es,
-        {
+        index="nginx-*",
+        query={
             "query": {
                 "bool": {
                     "must": [],
@@ -204,7 +205,7 @@ def dump_es_api_stats() -> None:
                         {
                             "bool": {
                                 "should": [
-                                    {"match": {"kubernetes.cluster": kube_cluster}},
+                                    {"match": {"kubernetes.cluster.keyword": kube_cluster}},
                                     {"match": {"nginx.http_user_agent": "Java"}},
                                 ],
                                 "minimum_should_match": 1,
