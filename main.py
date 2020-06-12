@@ -61,6 +61,7 @@ stats_table = Table(
     Column("path", String),
     Column("status", Integer),
     Column("response_time", Float),
+    Column("user_agent", String),
 )
 dd_stats_table = Table("dd_api_stats", meta, Column("date", Date, primary_key=True), Column("api_data", JSON))
 
@@ -208,7 +209,7 @@ def dump_es_api_stats() -> None:
                                     {"match": {"kubernetes.cluster.keyword": kube_cluster}},
                                     {"match": {"nginx.http_user_agent": "Java"}},
                                 ],
-                                "minimum_should_match": 1,
+                                "minimum_should_match": 2,
                             }
                         },
                         {
@@ -244,6 +245,7 @@ def dump_es_api_stats() -> None:
                     "path": data["nginx"]["path"],
                     "status": data["nginx"]["status"],
                     "response_time": data["nginx"]["upstream_response_time"],
+                    "user_agent": data["nginx"]["http_user_agent"],
                 }
             except Exception:
                 continue
