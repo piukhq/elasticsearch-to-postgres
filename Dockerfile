@@ -5,10 +5,10 @@ ADD pyproject.toml /app
 ADD poetry.lock /app
 ADD es_cacert.pem /app
 
-RUN apt update && apt -y install postgresql-client && \
-    apt clean && rm -rf /var/lib/apt/lists
+RUN apt-get update && apt-get -y install postgresql-client && \
+    apt-get clean && rm -rf /var/lib/apt/lists
 
-RUN pip --no-cache-dir install poetry && \
+RUN pip --no-cache-dir install poetry psycopg2-binary && \
     poetry config virtualenvs.create false && \
     poetry install --no-root --no-dev
 
