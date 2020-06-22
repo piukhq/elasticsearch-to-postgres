@@ -1,4 +1,4 @@
-FROM python:3.8
+FROM binkhq/python:3.8
 WORKDIR /app
 ADD main.py /app
 ADD pyproject.toml /app
