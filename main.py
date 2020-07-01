@@ -136,6 +136,7 @@ def dump_tables() -> None:
 
 def dump_dd_stats() -> None:
     es = elasticsearch.Elasticsearch(["starbug-elasticsearch"])
+    # es = elasticsearch.Elasticsearch(["localhost"])
 
     now = datetime.datetime.utcnow()
     yesterday = (now - datetime.timedelta(days=1)).date()
@@ -166,7 +167,7 @@ def dump_dd_stats() -> None:
 
     result = []
     for bucket in data["aggregations"]["by_uri"]["buckets"]:
-        result.append({"url": bucket["key"], "availability": (bucket["doc_count"] / 1440) * 100})
+        result.append({"url": bucket["key"], "availability": ((1440 - bucket["doc_count"]) / 1440) * 100})
 
     # Attempt to make tabes
     logger.info("Connecting to dd stats db")
