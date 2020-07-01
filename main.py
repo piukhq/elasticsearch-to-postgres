@@ -12,6 +12,7 @@ import ssl
 import sys
 from typing import cast, List, Dict, Any
 
+import dateutil.parser
 import elasticsearch
 import psycopg2
 import pylogrus
@@ -240,7 +241,7 @@ def dump_es_api_stats() -> None:
             try:
                 result = {
                     "id": item["_id"],
-                    "date": yesterday,
+                    "date": dateutil.parser.parse(data["@timestamp"]),
                     "method": data["nginx"]["method"],
                     "host": data["nginx"]["vhost"],
                     "path": data["nginx"]["path"],
