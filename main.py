@@ -25,7 +25,6 @@ logging.setLoggerClass(pylogrus.PyLogrus)
 
 SOURCE_DB_HOST = os.environ["SOURCE_DB_HOST"]
 SOURCE_DB_PORT = int(os.environ.get("SOURCE_DB_PORT", "5432"))
-SOURCE_DB_USER = os.environ.get("SOURCE_DB_USER", "postgres")
 SOURCE_DBS = os.environ["SOURCE_DBS"].split(",")
 DEST_DB_HOST = os.environ["DEST_DB_HOST"]
 DEST_DB_PORT = int(os.environ.get("DEST_DB_PORT", "5432"))
@@ -34,6 +33,8 @@ DEST_DB_PASSWORD = os.environ.get("DEST_DB_PASSWORD")
 ES_HOST = os.environ.get("ES_HOST", "elasticsearch.uksouth.bink.sh")
 if DEST_DB_PASSWORD is not None:
     DEST_DB_PASSWORD = DEST_DB_PASSWORD.strip()
+
+
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 DB_SYNC_TIMEOUT = int(os.environ.get("DB_SYNC_TIMEOUT", "3600"))
@@ -70,7 +71,7 @@ dd_stats_table = Table("dd_api_stats", meta, Column("date", Date, primary_key=Tr
 def kick_users(cursor) -> None:
     logger.info("Kicking any active users")
     # Dodgy in clause, should really use sqlalchmey
-    databases = ",".join([f"'{x}'" for x in SOURCE_DBS])
+    databases = ",".join([f"'{x.split('|')[0]}'" for x in SOURCE_DBS])
     sql = KILL_CONN_SQL.format(databases)
     # print(sql)
     cursor.execute(sql)
@@ -84,7 +85,7 @@ def drop_create_db(cursor, dbname: str) -> None:
     logger.withFields({"dbname": dbname}).info(f"Dropped and created database")
 
 
-def sync_data(dbname: str, timeout: int = DB_SYNC_TIMEOUT) -> None:
+def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> None:
     logger.withFields({"dbname": dbname}).info("Starting database sync")
     p1 = subprocess.Popen(
         (
@@ -93,7 +94,7 @@ def sync_data(dbname: str, timeout: int = DB_SYNC_TIMEOUT) -> None:
             "--clean",
             "-F",
             "custom",
-            f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={SOURCE_DB_USER}",
+            f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}",
         ),
         stdout=subprocess.PIPE,
         stderr=sys.stderr,
@@ -129,8 +130,9 @@ def dump_tables() -> None:
             kick_users(cur)
 
             for db in SOURCE_DBS:
+                db, dbuser = db.split('|', 1)
                 drop_create_db(cur, db)
-                sync_data(db)
+                sync_data(db, dbuser)
 
     logger.info("Finished syncing databases")
 
