@@ -35,7 +35,6 @@ if DEST_DB_PASSWORD is not None:
     DEST_DB_PASSWORD = DEST_DB_PASSWORD.strip()
 
 
-
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 DB_SYNC_TIMEOUT = int(os.environ.get("DB_SYNC_TIMEOUT", "3600"))
 ACCEPTABLE_DB_REGEX = re.compile(r"[a-z]+")
@@ -130,7 +129,7 @@ def dump_tables() -> None:
             kick_users(cur)
 
             for db in SOURCE_DBS:
-                db, dbuser = db.split('|', 1)
+                db, dbuser = db.split("|", 1)
                 drop_create_db(cur, db)
                 sync_data(db, dbuser)
 
