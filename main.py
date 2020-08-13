@@ -300,9 +300,7 @@ def main() -> None:
             fp.write(f"{DEST_DB_HOST}:{DEST_DB_PORT}:*:{DEST_DB_USER}:{DEST_DB_PASSWORD}\n")
         os.chmod(filename, 0o0600)
 
-    logger.withFields(
-        {"host": SOURCE_DB_HOST, "port": SOURCE_DB_PORT, "user": SOURCE_DB_USER, "databases": SOURCE_DBS}
-    ).info("Source DB Info")
+    logger.withFields({"host": SOURCE_DB_HOST, "port": SOURCE_DB_PORT, "databases": SOURCE_DBS}).info("Source DB Info")
     logger.withFields({"host": DEST_DB_HOST, "port": DEST_DB_PORT, "user": DEST_DB_USER}).info("Destination DB Info")
 
     if args.now:
