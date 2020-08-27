@@ -30,7 +30,7 @@ DEST_DB_HOST = os.environ["DEST_DB_HOST"]
 DEST_DB_PORT = int(os.environ.get("DEST_DB_PORT", "5432"))
 DEST_DB_USER = os.environ.get("DEST_DB_USER", "postgres")
 DEST_DB_PASSWORD = os.environ.get("DEST_DB_PASSWORD")
-ES_HOST = os.environ.get("ES_HOST", "elasticsearch.uksouth.bink.sh")
+ES_HOST = os.environ.get("ES_HOST", "elasticsearch.uksouth.bink.host")
 if DEST_DB_PASSWORD is not None:
     DEST_DB_PASSWORD = DEST_DB_PASSWORD.strip()
 
@@ -194,7 +194,7 @@ def dump_es_api_stats() -> None:
     now = datetime.datetime.utcnow()
     yesterday = (now - datetime.timedelta(days=1)).date()
 
-    kube_cluster = "prod.k8s.uksouth.bink.sh"
+    kube_cluster = "prod"
     start_date = yesterday.strftime("%Y-%m-%dT00:00:00.000Z")
     end_date = now.strftime("%Y-%m-%dT00:00:00.000Z")
 
@@ -209,8 +209,8 @@ def dump_es_api_stats() -> None:
                         {
                             "bool": {
                                 "should": [
-                                    {"match": {"kubernetes.cluster.keyword": kube_cluster}},
-                                    {"match": {"nginx.http_user_agent": "Java"}},
+                                    {"match": {"kubernetes.env.keyword": kube_cluster}},
+                                    {"match": {"nginx.http_user_agent": "Apache"}},
                                 ],
                                 "minimum_should_match": 2,
                             }
