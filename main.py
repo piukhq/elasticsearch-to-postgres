@@ -17,7 +17,7 @@ import elasticsearch
 import psycopg2
 import pylogrus
 import elasticsearch.helpers
-from sqlalchemy import create_engine, Table, Column, String, MetaData, Date, JSON, Integer, Float
+from sqlalchemy import create_engine, Table, Column, String, MetaData, Date, Integer, Float, Boolean
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers.blocking import BlockingScheduler
 
@@ -64,7 +64,15 @@ stats_table = Table(
     Column("response_time", Float),
     Column("user_agent", String),
 )
-dd_stats_table = Table("dd_api_stats", meta, Column("date", Date, primary_key=True), Column("api_data", JSON))
+dd_stats_table = Table(
+    "dd_api_stats_v2",
+    meta,
+    Column("id", String, primary_key=True),
+    Column("date", Date),
+    Column("url", String),
+    Column("error", Boolean),
+    Column("total_time", Float),
+)
 
 
 def kick_users(cursor) -> None:
@@ -146,30 +154,21 @@ def dump_dd_stats() -> None:
     start_date = yesterday.strftime("%Y-%m-%dT00:00:00.000Z")
     end_date = now.strftime("%Y-%m-%dT00:00:00.000Z")
 
-    data = es.search(
+    index_scan = elasticsearch.helpers.scan(
+        es,
         index="synthetics",
-        body={
-            "size": 0,
+        query={
             "query": {
                 "bool": {
-                    "must": {"wildcard": {"error": {"value": "*"}}},
                     "filter": {
                         "range": {
                             "timestamp": {"gte": start_date, "lt": end_date, "format": "strict_date_optional_time"}
                         }
                     },
                 }
-            },
-            "aggs": {"by_uri": {"terms": {"field": "url.keyword"}}},
+            }
         },
     )
-
-    # So 1 dd metric per minute
-    # (dd error count / 1440) * 100 = availabiltity
-
-    result = []
-    for bucket in data["aggregations"]["by_uri"]["buckets"]:
-        result.append({"url": bucket["key"], "availability": ((1440 - bucket["doc_count"]) / 1440) * 100})
 
     # Attempt to make tabes
     logger.info("Connecting to dd stats db")
@@ -177,8 +176,31 @@ def dump_dd_stats() -> None:
         logger.info("Creating tables")
         meta.create_all()
         logger.info("Insterting results")
-        stmt = dd_stats_table.insert().values(date=yesterday, api_data=result)
-        conn.execute(stmt)
+        counter = 0
+        for item in index_scan:
+            data = item["_source"]
+
+            try:
+                result = {
+                    "id": item["_id"],
+                    "date": dateutil.parser.parse(data["timestamp"]),
+                    "url": data["url"],
+                    "error": False if not data["error"] else True,
+                    "total_time": data["total"],
+                }
+            except Exception:
+                continue
+
+            stmt = stats_table.insert().values(**result)
+            try:
+                conn.execute(stmt)
+            except Exception:
+                pass
+            counter += 1
+
+            if counter % 100 == 0:
+                logger.info(f"Inserted {counter} values")
+
         logger.info("Insterted results")
 
 
