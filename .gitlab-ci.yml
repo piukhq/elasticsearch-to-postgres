@@ -5,7 +5,7 @@ stages:
 
 black:
   stage: tests
-  image: python:3.8
+  image: python:3.9
   script:
     - pip3 install poetry
     - poetry install
