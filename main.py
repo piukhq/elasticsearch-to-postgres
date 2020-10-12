@@ -191,7 +191,7 @@ def dump_dd_stats() -> None:
             except Exception:
                 continue
 
-            stmt = stats_table.insert().values(**result)
+            stmt = dd_stats_table.insert().values(**result)
             try:
                 conn.execute(stmt)
             except Exception:
