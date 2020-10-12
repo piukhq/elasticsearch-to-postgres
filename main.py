@@ -335,7 +335,7 @@ def main() -> None:
         scheduler = BlockingScheduler()
         scheduler.add_job(dump_tables, trigger=CronTrigger.from_crontab("0 2 * * *"))
         scheduler.add_job(dump_es_api_stats, trigger=CronTrigger.from_crontab("0 1 * * *"))
-        scheduler.add_job(dump_dd_stats, trigger=CronTrigger.from_crontab("5 1 * * *"))
+        scheduler.add_job(dump_dd_stats, trigger=CronTrigger.from_crontab("0 3 * * *"))
         scheduler.start()
 
 
