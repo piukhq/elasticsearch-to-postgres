@@ -5,7 +5,7 @@ description = "Syncs postgres db's between servers"
 authors = ["Terry Cain <tcain@bink.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 apscheduler = "^3.6.3"
 pylogrus = "^0.4.0"
 elasticsearch = "^7.7.0"

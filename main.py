@@ -17,7 +17,7 @@ import elasticsearch
 import psycopg2
 import pylogrus
 import elasticsearch.helpers
-from sqlalchemy import create_engine, Table, Column, String, MetaData, Date, Integer, Float, Boolean
+from sqlalchemy import create_engine, Table, Column, String, MetaData, Date, Integer, Float, Boolean, DateTime
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers.blocking import BlockingScheduler
 
@@ -68,7 +68,7 @@ dd_stats_table = Table(
     "dd_api_stats_v2",
     meta,
     Column("id", String, primary_key=True),
-    Column("date", Date),
+    Column("date", DateTime),
     Column("url", String),
     Column("error", Boolean),
     Column("total_time", Float),
