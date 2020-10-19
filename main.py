@@ -46,6 +46,7 @@ AND datname IN ({0});"""
 
 DROP_DB_SQL = """DROP DATABASE IF EXISTS {0};"""
 CREATE_DB_SQL = """CREATE DATABASE {0};"""
+REMOVE_HASHES_SQL = """UPDATE payment_card_paymentcardaccount SET hash = NULL;"""
 
 
 logger = cast(pylogrus.PyLogrus, logging.getLogger("postgres-syncer"))
@@ -82,6 +83,13 @@ def kick_users(cursor) -> None:
     sql = KILL_CONN_SQL.format(databases)
     # print(sql)
     cursor.execute(sql)
+    logger.info("Kicked users")
+
+
+def drop_hashes(cursor) -> None:
+    logger.info("Removing hashes")
+    # print(sql)
+    cursor.execute(REMOVE_HASHES_SQL)
     logger.info("Kicked users")
 
 
@@ -140,6 +148,8 @@ def dump_tables() -> None:
                 db, dbuser = db.split("|", 1)
                 drop_create_db(cur, db)
                 sync_data(db, dbuser)
+
+            drop_hashes(cur)
 
     logger.info("Finished syncing databases")
 
