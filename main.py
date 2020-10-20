@@ -149,7 +149,8 @@ def dump_tables() -> None:
                 drop_create_db(cur, db)
                 sync_data(db, dbuser)
 
-            drop_hashes(cur)
+    with psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=hermes port={DEST_DB_PORT}") as conn:
+        drop_hashes(cur)
 
     logger.info("Finished syncing databases")
 
