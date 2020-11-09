@@ -101,60 +101,57 @@ def drop_create_db(cursor, dbname: str) -> None:
     logger.withFields({"dbname": dbname}).info(f"Dropped and created database")
 
 
-def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> None:
+def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
     logger.withFields({"dbname": dbname}).info("Starting database sync")
-    attempt = 0
-
-    while attempt < 5:
-
-        p1 = subprocess.Popen(
-            (
-                "pg_dump",
-                "--create",
-                "--clean",
-                "-F",
-                "custom",
-                f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}",
-            ),
-            stdout=subprocess.PIPE,
-            stderr=sys.stderr,
-        )
-        p2 = subprocess.Popen(
-            (
-                "pg_restore",
-                "-h",
-                DEST_DB_HOST,
-                "-p",
-                str(DEST_DB_PORT),
-                "-d",
-                dbname,
-                "-U",
-                DEST_DB_USER,
-                "--no-owner",
-                "--no-privileges",
-            ),
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-            stdin=p1.stdout,
-        )
+    p1 = subprocess.Popen(
+        (
+            "pg_dump",
+            "--create",
+            "--clean",
+            "-F",
+            "custom",
+            f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}",
+        ),
+        stdout=subprocess.PIPE,
+        stderr=sys.stderr,
+    )
+    p2 = subprocess.Popen(
+        (
+            "pg_restore",
+            "-h",
+            DEST_DB_HOST,
+            "-p",
+            str(DEST_DB_PORT),
+            "-d",
+            dbname,
+            "-U",
+            DEST_DB_USER,
+            "--no-owner",
+            "--no-privileges",
+        ),
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        stdin=p1.stdout,
+    )
+    try:
+        ret_code = p2.wait(timeout)
+        if ret_code == 0:
+            logger.withFields({"dbname": dbname}).info("Finished database sync")
+            return True
+        else:
+            logger.withFields({"dbname": dbname}).error("Failed database sync")
+    except subprocess.TimeoutExpired:
+        logger.withFields({"dbname": dbname}).error("Database sync timed out")
+        p2.terminate()
         try:
-            ret_code = p2.wait(timeout)
-            if ret_code == 0:
-                logger.withFields({"dbname": dbname}).info("Finished database sync")
-                break
-            else:
-                logger.withFields({"dbname": dbname}).error("Failed database sync")
+            p2.wait(2)
         except subprocess.TimeoutExpired:
-            logger.withFields({"dbname": dbname}).error("Database sync timed out")
-            p2.terminate()
-            try:
-                p2.wait(2)
-            except subprocess.TimeoutExpired:
-                p2.kill()
+            p2.kill()
 
-        logger.info("Retrying in 5s")
-        attempt += 1
-        time.sleep(5)
+    logger.info("Retrying in 5s")
+    time.sleep(5)
+
+    return False
 
 
 def dump_tables() -> None:
@@ -168,8 +165,13 @@ def dump_tables() -> None:
 
             for db in SOURCE_DBS:
                 db, dbuser = db.split("|", 1)
-                drop_create_db(cur, db)
-                sync_data(db, dbuser)
+                attempt = 0
+                while attempt < 5:
+                    drop_create_db(cur, db)
+                    if sync_data(db, dbuser):
+                        break
+                    attempt += 1
+                    time.sleep(5)
 
     with psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=hermes port={DEST_DB_PORT}") as conn:
         with conn.cursor() as cur:
