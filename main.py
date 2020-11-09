@@ -10,7 +10,8 @@ import re
 import subprocess
 import ssl
 import sys
-from typing import cast, List, Dict, Any
+import time
+from typing import cast
 
 import dateutil.parser
 import elasticsearch
@@ -102,37 +103,58 @@ def drop_create_db(cursor, dbname: str) -> None:
 
 def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> None:
     logger.withFields({"dbname": dbname}).info("Starting database sync")
-    p1 = subprocess.Popen(
-        (
-            "pg_dump",
-            "--create",
-            "--clean",
-            "-F",
-            "custom",
-            f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}",
-        ),
-        stdout=subprocess.PIPE,
-        stderr=sys.stderr,
-    )
-    p2 = subprocess.Popen(
-        ("pg_restore", "-h", DEST_DB_HOST, "-p", str(DEST_DB_PORT), "-d", dbname, "-U", DEST_DB_USER),
-        stdout=sys.stdout,
-        stderr=sys.stderr,
-        stdin=p1.stdout,
-    )
-    try:
-        ret_code = p2.wait(timeout)
-        if ret_code == 0:
-            logger.withFields({"dbname": dbname}).info("Finished database sync")
-        else:
-            logger.withFields({"dbname": dbname}).error("Failed database sync")
-    except subprocess.TimeoutExpired:
-        logger.withFields({"dbname": dbname}).error("Database sync timed out")
-        p2.terminate()
+    attempt = 0
+
+    while attempt < 5:
+
+        p1 = subprocess.Popen(
+            (
+                "pg_dump",
+                "--create",
+                "--clean",
+                "-F",
+                "custom",
+                f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}",
+            ),
+            stdout=subprocess.PIPE,
+            stderr=sys.stderr,
+        )
+        p2 = subprocess.Popen(
+            (
+                "pg_restore",
+                "-h",
+                DEST_DB_HOST,
+                "-p",
+                str(DEST_DB_PORT),
+                "-d",
+                dbname,
+                "-U",
+                DEST_DB_USER,
+                "--no-owner",
+                "--no-privileges",
+            ),
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            stdin=p1.stdout,
+        )
         try:
-            p2.wait(2)
+            ret_code = p2.wait(timeout)
+            if ret_code == 0:
+                logger.withFields({"dbname": dbname}).info("Finished database sync")
+                break
+            else:
+                logger.withFields({"dbname": dbname}).error("Failed database sync")
         except subprocess.TimeoutExpired:
-            p2.kill()
+            logger.withFields({"dbname": dbname}).error("Database sync timed out")
+            p2.terminate()
+            try:
+                p2.wait(2)
+            except subprocess.TimeoutExpired:
+                p2.kill()
+
+        logger.info("Retrying in 5s")
+        attempt += 1
+        time.sleep(5)
 
 
 def dump_tables() -> None:
