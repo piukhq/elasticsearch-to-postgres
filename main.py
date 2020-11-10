@@ -161,12 +161,11 @@ def dump_tables() -> None:
         conn.autocommit = True
 
         with conn.cursor() as cur:
-            kick_users(cur)
-
             for db in SOURCE_DBS:
                 db, dbuser = db.split("|", 1)
                 attempt = 0
                 while attempt < 5:
+                    kick_users(cur)
                     drop_create_db(cur, db)
                     if sync_data(db, dbuser):
                         break
