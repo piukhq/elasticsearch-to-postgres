@@ -109,23 +109,21 @@ def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
         "--clean",
         "-F",
         "custom",
-        f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}"
+        f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}",
     ]
     if dbname == "atlas":
         sync_command = [
             "pg_dump",
             "--create",
             "--clean",
-            "--table", "transactions_*",
+            "--table",
+            "transactions_*",
             "-F",
             "custom",
-            f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}"
+            f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}",
         ]
 
-    p1 = subprocess.Popen(sync_command,
-        stdout=subprocess.PIPE,
-        stderr=sys.stderr,
-    )
+    p1 = subprocess.Popen(sync_command, stdout=subprocess.PIPE, stderr=sys.stderr,)
     p2 = subprocess.Popen(
         (
             "pg_restore",
