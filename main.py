@@ -103,15 +103,26 @@ def drop_create_db(cursor, dbname: str) -> None:
 
 def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
     logger.withFields({"dbname": dbname}).info("Starting database sync")
-    p1 = subprocess.Popen(
-        (
+    sync_command = [
+        "pg_dump",
+        "--create",
+        "--clean",
+        "-F",
+        "custom",
+        f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}"
+    ]
+    if dbname == "atlas":
+        sync_command = [
             "pg_dump",
             "--create",
             "--clean",
+            "--table", "transactions_*",
             "-F",
             "custom",
-            f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}",
-        ),
+            f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}"
+        ]
+
+    p1 = subprocess.Popen(sync_command,
         stdout=subprocess.PIPE,
         stderr=sys.stderr,
     )
