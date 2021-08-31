@@ -37,7 +37,7 @@ if DEST_DB_PASSWORD is not None:
 
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
-DB_SYNC_TIMEOUT = int(os.environ.get("DB_SYNC_TIMEOUT", "10800"))
+DB_SYNC_TIMEOUT = int(os.environ.get("DB_SYNC_TIMEOUT", "21600"))
 ACCEPTABLE_DB_REGEX = re.compile(r"[a-z]+")
 
 KILL_CONN_SQL = """SELECT pg_terminate_backend(pid) 
