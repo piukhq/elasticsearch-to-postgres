@@ -9,7 +9,6 @@ python = "^3.9"
 apscheduler = "*"
 pylogrus = "*"
 elasticsearch = "^7.7.0"
-psycopg2-binary = "*"
 sqlalchemy = {extras = ["psycopg2"], version = "*"}
 python-dateutil = "*"
 
