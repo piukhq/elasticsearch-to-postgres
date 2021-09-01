@@ -169,17 +169,19 @@ def dump_tables() -> None:
     with psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=postgres port={DEST_DB_PORT}") as conn:
         conn.autocommit = True
 
-        with conn.cursor() as cur:
-            for db in SOURCE_DBS:
-                db, dbuser = db.split("|", 1)
-                attempt = 0
-                while attempt < 5:
+        for db in SOURCE_DBS:
+            db, dbuser = db.split("|", 1)
+            attempt = 0
+            while attempt < 5:
+                with conn.cursor() as cur:
                     kick_users(cur)
+                with conn.cursor() as cur:
                     drop_create_db(cur, db)
+                with conn.cursor() as cur:
                     if sync_data(db, dbuser):
                         break
-                    attempt += 1
-                    time.sleep(5)
+                attempt += 1
+                time.sleep(5)
 
     with psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=hermes port={DEST_DB_PORT}") as conn:
         with conn.cursor() as cur:

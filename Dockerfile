@@ -5,7 +5,7 @@ ADD pyproject.toml /app
 ADD poetry.lock /app
 ADD es_cacert.pem /app
 
-RUN apt-get update && apt-get -y install postgresql-client && \
+RUN apt-get update && apt-get -y install postgresql-client nano && \
     apt-get clean && rm -rf /var/lib/apt/lists
 
 RUN pip --no-cache-dir install poetry psycopg2-binary && \
