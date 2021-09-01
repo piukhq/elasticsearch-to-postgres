@@ -166,7 +166,10 @@ def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
 def dump_tables() -> None:
     logger.info("Syncing databases")
 
-    with psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=postgres port={DEST_DB_PORT}") as conn:
+    conn = None
+    try:
+        # psycopg2 changed how it works, so using a with resources statement automatically starts a transaction
+        conn = psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=postgres port={DEST_DB_PORT}")
         conn.autocommit = True
 
         for db in SOURCE_DBS:
@@ -177,11 +180,13 @@ def dump_tables() -> None:
                     kick_users(cur)
                 with conn.cursor() as cur:
                     drop_create_db(cur, db)
-                with conn.cursor() as cur:
-                    if sync_data(db, dbuser):
-                        break
+                if sync_data(db, dbuser):
+                    break
                 attempt += 1
                 time.sleep(5)
+    finally:
+        if conn:
+            conn.close()
 
     with psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=hermes port={DEST_DB_PORT}") as conn:
         with conn.cursor() as cur:
