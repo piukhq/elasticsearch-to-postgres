@@ -6,15 +6,15 @@ authors = ["Terry Cain <tcain@bink.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
-apscheduler = "^3.6.3"
-pylogrus = "^0.4.0"
+apscheduler = "*"
+pylogrus = "*"
 elasticsearch = "^7.7.0"
-sqlalchemy = {extras = ["psycopg2"], version = "^1.3.17"}
-python-dateutil = "^2.8.1"
+psycopg2-binary = "*"
+sqlalchemy = {extras = ["psycopg2"], version = "*"}
+python-dateutil = "*"
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"
-psycopg2 = "^2.8.5"
 
 [build-system]
 requires = ["poetry>=0.12"]
