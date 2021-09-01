@@ -27,7 +27,9 @@ build-develop:
 tag-develop:
   stage: deploy
   image: binkops.azurecr.io/tagbot:latest
+  before_script:
+    - export CTAG=$(echo -n "$CI_PIPELINE_CREATED_AT" | sed s/\://g)
   script:
-    - tagbot --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" --source "$CI_REGISTRY/postgres-syncer:latest" --tag "develop-$CI_COMMIT_SHORT_SHA"
+    - tagbot --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" --source "$CI_REGISTRY/postgres-syncer:latest" --tag "develop-$CTAG"
   only:
     - master

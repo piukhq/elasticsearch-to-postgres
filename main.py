@@ -52,7 +52,7 @@ REMOVE_HASHES_SQL = """UPDATE payment_card_paymentcardaccount SET hash = NULL;""
 
 logger = cast(pylogrus.PyLogrus, logging.getLogger("postgres-syncer"))
 
-dest_db_apistats = create_engine(f"postgres://{DEST_DB_USER}:{DEST_DB_PASSWORD}@{DEST_DB_HOST}:{DEST_DB_PORT}/apistats")
+dest_db_apistats = create_engine(f"postgresql://{DEST_DB_USER}:{DEST_DB_PASSWORD}@{DEST_DB_HOST}:{DEST_DB_PORT}/apistats")
 meta = MetaData(dest_db_apistats)
 stats_table = Table(
     "api_stats_v2",
