@@ -104,9 +104,7 @@ def teams_notify(message):
         "Sections": [
             {
                 "activityTitle": "Failed Database Sync",
-                "facts": [
-                    {"name": "Message", "value": message},
-                ],
+                "facts": [{"name": "Message", "value": message},],
                 "markdown": False,
             }
         ],
@@ -160,11 +158,7 @@ def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
             f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}",
         ]
 
-    p1 = subprocess.Popen(
-        sync_command,
-        stdout=subprocess.PIPE,
-        stderr=sys.stderr,
-    )
+    p1 = subprocess.Popen(sync_command, stdout=subprocess.PIPE, stderr=sys.stderr,)
     p2 = subprocess.Popen(
         (
             "pg_restore",
@@ -212,9 +206,7 @@ def dump_tables() -> None:
     conn = None
     try:
         # psycopg2 changed how it works, so using a with resources statement automatically starts a transaction
-        conn = psycopg2.connect(
-            f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=postgres port={DEST_DB_PORT}"
-        )
+        conn = psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=postgres port={DEST_DB_PORT}")
         conn.autocommit = True
 
         for db in SOURCE_DBS:
@@ -233,9 +225,7 @@ def dump_tables() -> None:
         if conn:
             conn.close()
 
-    with psycopg2.connect(
-        f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=hermes port={DEST_DB_PORT}"
-    ) as conn:
+    with psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=hermes port={DEST_DB_PORT}") as conn:
         with conn.cursor() as cur:
             drop_hashes(cur)
 
@@ -260,11 +250,7 @@ def dump_dd_stats() -> None:
                 "bool": {
                     "filter": {
                         "range": {
-                            "timestamp": {
-                                "gte": start_date,
-                                "lt": end_date,
-                                "format": "strict_date_optional_time",
-                            }
+                            "timestamp": {"gte": start_date, "lt": end_date, "format": "strict_date_optional_time",}
                         }
                     },
                 }
@@ -312,10 +298,7 @@ def dump_es_api_stats() -> None:
     ctx.verify_mode = ssl.CERT_NONE if ES_HOST == "localhost" else ssl.CERT_REQUIRED
 
     es = elasticsearch.Elasticsearch(
-        [ES_HOST],
-        http_auth=("starbug", "PPwu7*Cq%H2JOEj2lE@O3423vVSNgybd"),
-        scheme="https",
-        ssl_context=ctx,
+        [ES_HOST], http_auth=("starbug", "PPwu7*Cq%H2JOEj2lE@O3423vVSNgybd"), scheme="https", ssl_context=ctx,
     )
 
     now = datetime.datetime.utcnow()
@@ -411,9 +394,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--now", action="store_true", help="Run database sync now")
     parser.add_argument("--es", action="store_true", help="Run elasticsearch dump now")
-    parser.add_argument(
-        "--es-dd", action="store_true", help="Run elasticsearch dump now"
-    )
+    parser.add_argument("--es-dd", action="store_true", help="Run elasticsearch dump now")
     args = parser.parse_args()
 
     if SOURCE_DB_HOST == DEST_DB_HOST and SOURCE_DB_PORT == DEST_DB_PORT:
@@ -430,17 +411,11 @@ def main() -> None:
     if DEST_DB_PASSWORD:
         filename = os.path.expanduser("~/.pgpass")
         with open(filename, "w") as fp:
-            fp.write(
-                f"{DEST_DB_HOST}:{DEST_DB_PORT}:*:{DEST_DB_USER}:{DEST_DB_PASSWORD}\n"
-            )
+            fp.write(f"{DEST_DB_HOST}:{DEST_DB_PORT}:*:{DEST_DB_USER}:{DEST_DB_PASSWORD}\n")
         os.chmod(filename, 0o0600)
 
-    logger.withFields(
-        {"host": SOURCE_DB_HOST, "port": SOURCE_DB_PORT, "databases": SOURCE_DBS}
-    ).info("Source DB Info")
-    logger.withFields(
-        {"host": DEST_DB_HOST, "port": DEST_DB_PORT, "user": DEST_DB_USER}
-    ).info("Destination DB Info")
+    logger.withFields({"host": SOURCE_DB_HOST, "port": SOURCE_DB_PORT, "databases": SOURCE_DBS}).info("Source DB Info")
+    logger.withFields({"host": DEST_DB_HOST, "port": DEST_DB_PORT, "user": DEST_DB_USER}).info("Destination DB Info")
 
     if args.now:
         dump_tables()
@@ -451,9 +426,7 @@ def main() -> None:
     else:
         scheduler = BlockingScheduler()
         scheduler.add_job(dump_tables, trigger=CronTrigger.from_crontab("0 4 * * *"))
-        scheduler.add_job(
-            dump_es_api_stats, trigger=CronTrigger.from_crontab("0 1 * * *")
-        )
+        scheduler.add_job(dump_es_api_stats, trigger=CronTrigger.from_crontab("0 1 * * *"))
         scheduler.add_job(dump_dd_stats, trigger=CronTrigger.from_crontab("0 3 * * *"))
         scheduler.start()
 
