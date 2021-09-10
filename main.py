@@ -95,7 +95,7 @@ def teams_notify(message):
     """
     Sends `message` to the 'Prototype' channel on Microsoft Teams.
     """
-    TEAMS_WEBHOOK_URL = "https://hellobink.webhook.office.com/webhookb2/bf220ac8-d509-474f-a568-148982784d19@a6e2367a-92ea-4e5a-b565-723830bcc095/IncomingWebhook/c9713c5146cc47588efca7e6a7cccd35/bba71e03-172e-4d07-8ee4-aad029d9031d"  # noqa: E501
+    TEAMS_WEBHOOK_URL = "https://hellobink.webhook.office.com/webhookb2/bf220ac8-d509-474f-a568-148982784d19@a6e2367a-92ea-4e5a-b565-723830bcc095/IncomingWebhook/edc46bc8aa4948428302736a978cc819/bba71e03-172e-4d07-8ee4-aad029d9031d"  # noqa: E501
     template = {
         "@type": "MessageCard",
         "@context": "http://schema.org/extensions",
@@ -103,7 +103,7 @@ def teams_notify(message):
         "summary": "A database sync has failed",
         "Sections": [
             {
-                "activityTitle": "Failed Database Sync",
+                "activityTitle": "Database Sync Error",
                 "facts": [{"name": "Message", "value": message},],
                 "markdown": False,
             }
