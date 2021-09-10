@@ -11,6 +11,7 @@ import subprocess
 import ssl
 import sys
 import time
+import requests
 from typing import cast
 
 import dateutil.parser
@@ -78,6 +79,29 @@ dd_stats_table = Table(
     Column("total_time", Float),
 )
 
+
+def teams_notify(message):
+    """
+    Sends `message` to the 'Prototype' channel on Microsoft Teams.
+    """
+    TEAMS_WEBHOOK_URL = "https://hellobink.webhook.office.com/webhookb2/bf220ac8-d509-474f-a568-148982784d19@a6e2367a-92ea-4e5a-b565-723830bcc095/IncomingWebhook/c9713c5146cc47588efca7e6a7cccd35/bba71e03-172e-4d07-8ee4-aad029d9031d"  # noqa: E501
+    template = {
+        "@type": "MessageCard",
+        "@context": "http://schema.org/extensions",
+        "themeColor": "1A1F71",
+        "summary": "A database sync has failed",
+        "Sections": [
+            {
+                "activityTitle": "Failed Database Sync",
+                "facts": [
+                    {"name": "Message", "value": message},
+                ],
+                "markdown": False,
+            }
+        ],
+    }
+    return requests.post(TEAMS_WEBHOOK_URL, json=template)
+    
 
 def kick_users(cursor) -> None:
     logger.info("Kicking any active users")
@@ -151,8 +175,10 @@ def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
             return True
         else:
             logger.withFields({"dbname": dbname}).error("Failed database sync")
+            teams_notify(dbname + " database has failed to sync")
     except subprocess.TimeoutExpired:
         logger.withFields({"dbname": dbname}).error("Database sync timed out")
+        teams_notify(dbname + " database sync has timed out")
         p2.terminate()
         try:
             p2.wait(2)
