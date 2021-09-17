@@ -219,6 +219,9 @@ def dump_tables() -> None:
                     drop_create_db(cur, db)
                 if sync_data(db, dbuser):
                     break
+                elif sync_data(db, dbuser) and attempt > 1:
+                    teams_notify(db + "database sync succeeded on retry")
+                    break
                 attempt += 1
                 time.sleep(5)
     finally:
