@@ -217,7 +217,10 @@ def dump_tables() -> None:
                     kick_users(cur)
                 with conn.cursor() as cur:
                     drop_create_db(cur, db)
-                if sync_data(db, dbuser):
+                if sync_data(db, dbuser) and attempt > 0:
+                    teams_notify(db + "database sync succeeded on retry")
+                    break
+                elif sync_data(db, dbuser):
                     break
                 attempt += 1
                 time.sleep(5)
