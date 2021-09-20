@@ -288,38 +288,38 @@ def dump_dd_stats() -> None:
             },
         )
 
-    # Attempt to make tabes
-    logger.info("Connecting to dd stats db")
-    with dest_db_apistats.connect() as conn:
-        logger.info("Creating tables")
-        meta.create_all()
-        logger.info("Insterting results")
-        counter = 0
-        for item in index_scan:
-            data = item["_source"]
+        # Attempt to make tabes
+        logger.info("Connecting to dd stats db")
+        with dest_db_apistats.connect() as conn:
+            logger.info("Creating tables")
+            meta.create_all()
+            logger.info("Insterting results")
+            counter = 0
+            for item in index_scan:
+                data = item["_source"]
 
-            try:
-                result = {
-                    "id": item["_id"],
-                    "date": dateutil.parser.parse(data["timestamp"]),
-                    "url": data["url"],
-                    "error": False if not data["error"] else True,
-                    "total_time": data["total"],
-                }
-            except Exception:
-                continue
+                try:
+                    result = {
+                        "id": item["_id"],
+                        "date": dateutil.parser.parse(data["timestamp"]),
+                        "url": data["url"],
+                        "error": False if not data["error"] else True,
+                        "total_time": data["total"],
+                    }
+                except Exception:
+                    continue
 
-            stmt = dd_stats_table.insert().values(**result)
-            try:
-                conn.execute(stmt)
-            except Exception:
-                pass
-            counter += 1
+                stmt = dd_stats_table.insert().values(**result)
+                try:
+                    conn.execute(stmt)
+                except Exception:
+                    pass
+                counter += 1
 
-            if counter % 100 == 0:
-                logger.info(f"Inserted {counter} values")
+                if counter % 100 == 0:
+                    logger.info(f"Inserted {counter} values")
 
-        logger.info("Insterted results")
+            logger.info("Insterted results")
 
 
 def dump_es_api_stats() -> None:
