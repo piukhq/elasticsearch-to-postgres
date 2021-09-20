@@ -228,7 +228,7 @@ def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
 def dump_tables() -> None:
     if not is_leader():
         return
-    
+
     logger.info("Syncing databases")
 
     conn = None
@@ -329,7 +329,7 @@ def dump_dd_stats() -> None:
 def dump_es_api_stats() -> None:
     if not is_leader():
         return
-        
+
     ctx = ssl.create_default_context(cafile="es_cacert.pem")
     ctx.check_hostname = False if ES_HOST == "localhost" else True
     ctx.verify_mode = ssl.CERT_NONE if ES_HOST == "localhost" else ssl.CERT_REQUIRED
