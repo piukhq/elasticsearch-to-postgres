@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "91ac37f74c069bd779d06722996fb0d2b0e5313dd2bcf10435c241736e3963ae"
+            "sha256": "5cbdafc5c8dbab411bbbcfc53e8de4a150a12a6bb61bf105fa8c78c344bc37df"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -31,6 +31,14 @@
             ],
             "version": "==2021.5.30"
         },
+        "charset-normalizer": {
+            "hashes": [
+                "sha256:5d209c0a931f215cee683b6445e2d77677e7e75e159f78def0db09d68fafcaa6",
+                "sha256:5ec46d183433dcbd0ab716f2d7f29d8dee50505b3fdb40c6b985c7c4f5a3591f"
+            ],
+            "markers": "python_version >= '3'",
+            "version": "==2.0.6"
+        },
         "elasticsearch": {
             "hashes": [
                 "sha256:1a9f146b7126a7e0621085f1825b6b2d091693a714d3b16c208749762e79c2bc",
@@ -38,6 +46,14 @@
             ],
             "index": "pypi",
             "version": "==7.14.1"
+        },
+        "idna": {
+            "hashes": [
+                "sha256:14475042e284991034cb48e06f6851428fb14c4dc953acd9be9a5e95c7b6dd7a",
+                "sha256:467fbad99067910785144ce333826c71fb0e63a425657295239737f7ecd125f3"
+            ],
+            "markers": "python_version >= '3'",
+            "version": "==3.2"
         },
         "psycopg2-binary": {
             "hashes": [
@@ -104,6 +120,14 @@
             ],
             "index": "pypi",
             "version": "==3.5.3"
+        },
+        "requests": {
+            "hashes": [
+                "sha256:6c1246513ecd5ecd4528a0906f910e8f0f9c6b8ec72030dc9fd154dc1a6efd24",
+                "sha256:b8aa58f8cf793ffd8782d3d8cb19e66ef36f7aba4353eec859e74678b01b07a7"
+            ],
+            "index": "pypi",
+            "version": "==2.26.0"
         },
         "six": {
             "hashes": [
@@ -496,7 +520,7 @@
                 "sha256:6c1246513ecd5ecd4528a0906f910e8f0f9c6b8ec72030dc9fd154dc1a6efd24",
                 "sha256:b8aa58f8cf793ffd8782d3d8cb19e66ef36f7aba4353eec859e74678b01b07a7"
             ],
-            "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3, 3.4, 3.5'",
+            "index": "pypi",
             "version": "==2.26.0"
         },
         "six": {
