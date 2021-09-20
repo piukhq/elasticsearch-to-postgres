@@ -7,6 +7,7 @@ import datetime
 import os
 import logging
 import re
+import redis
 import subprocess
 import ssl
 import sys
@@ -35,6 +36,9 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 logging.setLoggerClass(pylogrus.PyLogrus)
+
+# Leader Election
+redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 SOURCE_DB_HOST = os.environ["SOURCE_DB_HOST"]
 SOURCE_DB_PORT = int(os.environ.get("SOURCE_DB_PORT", "5432"))
@@ -91,6 +95,26 @@ dd_stats_table = Table(
 )
 
 
+def is_leader():
+    r = redis.Redis.from_url(redis_url)
+    lock_key = "harmonia-reporter-lock"
+    hostname = socket.gethostname()
+    is_leader = False
+
+    with r.pipeline() as pipe:
+        try:
+            pipe.watch(lock_key)
+            leader_host = pipe.get(lock_key)
+            if leader_host in (hostname.encode(), None):
+                pipe.multi()
+                pipe.setex(lock_key, 10, hostname)
+                pipe.execute()
+                is_leader = True
+        except redis.WatchError:
+            pass
+    return is_leader
+
+
 def teams_notify(message):
     """
     Sends `message` to the 'Prototype' channel on Microsoft Teams.
@@ -104,7 +128,9 @@ def teams_notify(message):
         "Sections": [
             {
                 "activityTitle": "Database Sync Error",
-                "facts": [{"name": "Message", "value": message},],
+                "facts": [
+                    {"name": "Message", "value": message},
+                ],
                 "markdown": False,
             }
         ],
@@ -158,7 +184,11 @@ def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
             f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}",
         ]
 
-    p1 = subprocess.Popen(sync_command, stdout=subprocess.PIPE, stderr=sys.stderr,)
+    p1 = subprocess.Popen(
+        sync_command,
+        stdout=subprocess.PIPE,
+        stderr=sys.stderr,
+    )
     p2 = subprocess.Popen(
         (
             "pg_restore",
@@ -253,7 +283,11 @@ def dump_dd_stats() -> None:
                 "bool": {
                     "filter": {
                         "range": {
-                            "timestamp": {"gte": start_date, "lt": end_date, "format": "strict_date_optional_time",}
+                            "timestamp": {
+                                "gte": start_date,
+                                "lt": end_date,
+                                "format": "strict_date_optional_time",
+                            }
                         }
                     },
                 }
@@ -301,7 +335,10 @@ def dump_es_api_stats() -> None:
     ctx.verify_mode = ssl.CERT_NONE if ES_HOST == "localhost" else ssl.CERT_REQUIRED
 
     es = elasticsearch.Elasticsearch(
-        [ES_HOST], http_auth=("starbug", "PPwu7*Cq%H2JOEj2lE@O3423vVSNgybd"), scheme="https", ssl_context=ctx,
+        [ES_HOST],
+        http_auth=("starbug", "PPwu7*Cq%H2JOEj2lE@O3423vVSNgybd"),
+        scheme="https",
+        ssl_context=ctx,
     )
 
     now = datetime.datetime.utcnow()
@@ -384,54 +421,59 @@ def dump_es_api_stats() -> None:
 
 
 def main() -> None:
-    logger.setLevel(LOG_LEVEL)
-    formatter = pylogrus.TextFormatter(datefmt="Z", colorize=False)
-    # formatter = pylogrus.JsonFormatter()  # Can switch to json if needed
-    ch = logging.StreamHandler()
-    ch.setLevel(LOG_LEVEL)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+    if is_leader():
+        logger.setLevel(LOG_LEVEL)
+        formatter = pylogrus.TextFormatter(datefmt="Z", colorize=False)
+        # formatter = pylogrus.JsonFormatter()  # Can switch to json if needed
+        ch = logging.StreamHandler()
+        ch.setLevel(LOG_LEVEL)
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
 
-    logger.info("Started postgres syncer")
+        logger.info("Started postgres syncer")
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--now", action="store_true", help="Run database sync now")
-    parser.add_argument("--es", action="store_true", help="Run elasticsearch dump now")
-    parser.add_argument("--es-dd", action="store_true", help="Run elasticsearch dump now")
-    args = parser.parse_args()
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--now", action="store_true", help="Run database sync now")
+        parser.add_argument("--es", action="store_true", help="Run elasticsearch dump now")
+        parser.add_argument("--es-dd", action="store_true", help="Run elasticsearch dump now")
+        args = parser.parse_args()
 
-    if SOURCE_DB_HOST == DEST_DB_HOST and SOURCE_DB_PORT == DEST_DB_PORT:
-        logger.critical("Cant sync data to the same place")
-        sys.exit(1)
-    if SOURCE_DBS == [""]:
-        logger.critical("DBs must be provided")
-        sys.exit(1)
-    for db in SOURCE_DBS:
-        if not ACCEPTABLE_DB_REGEX.match(db):
-            logger.withFields({"dbname": db}).critical(f"DB not an acceptable db name")
+        if SOURCE_DB_HOST == DEST_DB_HOST and SOURCE_DB_PORT == DEST_DB_PORT:
+            logger.critical("Cant sync data to the same place")
             sys.exit(1)
+        if SOURCE_DBS == [""]:
+            logger.critical("DBs must be provided")
+            sys.exit(1)
+        for db in SOURCE_DBS:
+            if not ACCEPTABLE_DB_REGEX.match(db):
+                logger.withFields({"dbname": db}).critical(f"DB not an acceptable db name")
+                sys.exit(1)
 
-    if DEST_DB_PASSWORD:
-        filename = os.path.expanduser("~/.pgpass")
-        with open(filename, "w") as fp:
-            fp.write(f"{DEST_DB_HOST}:{DEST_DB_PORT}:*:{DEST_DB_USER}:{DEST_DB_PASSWORD}\n")
-        os.chmod(filename, 0o0600)
+        if DEST_DB_PASSWORD:
+            filename = os.path.expanduser("~/.pgpass")
+            with open(filename, "w") as fp:
+                fp.write(f"{DEST_DB_HOST}:{DEST_DB_PORT}:*:{DEST_DB_USER}:{DEST_DB_PASSWORD}\n")
+            os.chmod(filename, 0o0600)
 
-    logger.withFields({"host": SOURCE_DB_HOST, "port": SOURCE_DB_PORT, "databases": SOURCE_DBS}).info("Source DB Info")
-    logger.withFields({"host": DEST_DB_HOST, "port": DEST_DB_PORT, "user": DEST_DB_USER}).info("Destination DB Info")
+        logger.withFields({"host": SOURCE_DB_HOST, "port": SOURCE_DB_PORT, "databases": SOURCE_DBS}).info(
+            "Source DB Info"
+        )
+        logger.withFields({"host": DEST_DB_HOST, "port": DEST_DB_PORT, "user": DEST_DB_USER}).info(
+            "Destination DB Info"
+        )
 
-    if args.now:
-        dump_tables()
-    elif args.es:
-        dump_es_api_stats()
-    elif args.es_dd:
-        dump_dd_stats()
-    else:
-        scheduler = BlockingScheduler()
-        scheduler.add_job(dump_tables, trigger=CronTrigger.from_crontab("0 4 * * *"))
-        scheduler.add_job(dump_es_api_stats, trigger=CronTrigger.from_crontab("0 1 * * *"))
-        scheduler.add_job(dump_dd_stats, trigger=CronTrigger.from_crontab("0 3 * * *"))
-        scheduler.start()
+        if args.now:
+            dump_tables()
+        elif args.es:
+            dump_es_api_stats()
+        elif args.es_dd:
+            dump_dd_stats()
+        else:
+            scheduler = BlockingScheduler()
+            scheduler.add_job(dump_tables, trigger=CronTrigger.from_crontab("0 4 * * *"))
+            scheduler.add_job(dump_es_api_stats, trigger=CronTrigger.from_crontab("0 1 * * *"))
+            scheduler.add_job(dump_dd_stats, trigger=CronTrigger.from_crontab("0 3 * * *"))
+            scheduler.start()
 
 
 if __name__ == "__main__":
