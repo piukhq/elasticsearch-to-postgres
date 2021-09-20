@@ -226,189 +226,195 @@ def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
 
 
 def dump_tables() -> None:
-    if is_leader():
-        logger.info("Syncing databases")
+    if not is_leader():
+        return
+    
+    logger.info("Syncing databases")
 
-        conn = None
-        try:
-            # psycopg2 changed how it works, so using a with resources statement automatically starts a transaction
-            conn = psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=postgres port={DEST_DB_PORT}")
-            conn.autocommit = True
+    conn = None
+    try:
+        # psycopg2 changed how it works, so using a with resources statement automatically starts a transaction
+        conn = psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=postgres port={DEST_DB_PORT}")
+        conn.autocommit = True
 
-            for db in SOURCE_DBS:
-                db, dbuser = db.split("|", 1)
-                attempt = 0
-                while attempt < 5:
-                    with conn.cursor() as cur:
-                        kick_users(cur)
-                    with conn.cursor() as cur:
-                        drop_create_db(cur, db)
-                    if sync_data(db, dbuser) and attempt > 0:
-                        teams_notify(db + "database sync succeeded on retry")
-                        break
-                    elif sync_data(db, dbuser):
-                        break
-                    attempt += 1
-                    time.sleep(5)
-        finally:
-            if conn:
-                conn.close()
+        for db in SOURCE_DBS:
+            db, dbuser = db.split("|", 1)
+            attempt = 0
+            while attempt < 5:
+                with conn.cursor() as cur:
+                    kick_users(cur)
+                with conn.cursor() as cur:
+                    drop_create_db(cur, db)
+                if sync_data(db, dbuser) and attempt > 0:
+                    teams_notify(db + "database sync succeeded on retry")
+                    break
+                elif sync_data(db, dbuser):
+                    break
+                attempt += 1
+                time.sleep(5)
+    finally:
+        if conn:
+            conn.close()
 
-        with psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=hermes port={DEST_DB_PORT}") as conn:
-            with conn.cursor() as cur:
-                drop_hashes(cur)
+    with psycopg2.connect(f"host={DEST_DB_HOST} user={DEST_DB_USER} dbname=hermes port={DEST_DB_PORT}") as conn:
+        with conn.cursor() as cur:
+            drop_hashes(cur)
 
-        logger.info("Finished syncing databases")
+    logger.info("Finished syncing databases")
 
 
 def dump_dd_stats() -> None:
-    if is_leader():
-        es = elasticsearch.Elasticsearch(["starbug-elasticsearch"])
-        # es = elasticsearch.Elasticsearch(["localhost"])
+    if not is_leader():
+        return
 
-        now = datetime.datetime.utcnow()
-        yesterday = (now - datetime.timedelta(days=1)).date()
+    es = elasticsearch.Elasticsearch(["starbug-elasticsearch"])
+    # es = elasticsearch.Elasticsearch(["localhost"])
 
-        start_date = yesterday.strftime("%Y-%m-%dT00:00:00.000Z")
-        end_date = now.strftime("%Y-%m-%dT00:00:00.000Z")
+    now = datetime.datetime.utcnow()
+    yesterday = (now - datetime.timedelta(days=1)).date()
 
-        index_scan = elasticsearch.helpers.scan(
-            es,
-            index="synthetics",
-            query={
-                "query": {
-                    "bool": {
-                        "filter": {
-                            "range": {
-                                "timestamp": {"gte": start_date, "lt": end_date, "format": "strict_date_optional_time",}
-                            }
-                        },
-                    }
+    start_date = yesterday.strftime("%Y-%m-%dT00:00:00.000Z")
+    end_date = now.strftime("%Y-%m-%dT00:00:00.000Z")
+
+    index_scan = elasticsearch.helpers.scan(
+        es,
+        index="synthetics",
+        query={
+            "query": {
+                "bool": {
+                    "filter": {
+                        "range": {
+                            "timestamp": {"gte": start_date, "lt": end_date, "format": "strict_date_optional_time",}
+                        }
+                    },
                 }
-            },
-        )
+            }
+        },
+    )
 
-        # Attempt to make tabes
-        logger.info("Connecting to dd stats db")
-        with dest_db_apistats.connect() as conn:
-            logger.info("Creating tables")
-            meta.create_all()
-            logger.info("Insterting results")
-            counter = 0
-            for item in index_scan:
-                data = item["_source"]
+    # Attempt to make tabes
+    logger.info("Connecting to dd stats db")
+    with dest_db_apistats.connect() as conn:
+        logger.info("Creating tables")
+        meta.create_all()
+        logger.info("Insterting results")
+        counter = 0
+        for item in index_scan:
+            data = item["_source"]
 
-                try:
-                    result = {
-                        "id": item["_id"],
-                        "date": dateutil.parser.parse(data["timestamp"]),
-                        "url": data["url"],
-                        "error": False if not data["error"] else True,
-                        "total_time": data["total"],
-                    }
-                except Exception:
-                    continue
+            try:
+                result = {
+                    "id": item["_id"],
+                    "date": dateutil.parser.parse(data["timestamp"]),
+                    "url": data["url"],
+                    "error": False if not data["error"] else True,
+                    "total_time": data["total"],
+                }
+            except Exception:
+                continue
 
-                stmt = dd_stats_table.insert().values(**result)
-                try:
-                    conn.execute(stmt)
-                except Exception:
-                    pass
-                counter += 1
+            stmt = dd_stats_table.insert().values(**result)
+            try:
+                conn.execute(stmt)
+            except Exception:
+                pass
+            counter += 1
 
-                if counter % 100 == 0:
-                    logger.info(f"Inserted {counter} values")
+            if counter % 100 == 0:
+                logger.info(f"Inserted {counter} values")
 
-            logger.info("Insterted results")
+        logger.info("Insterted results")
 
 
 def dump_es_api_stats() -> None:
-    if is_leader():
-        ctx = ssl.create_default_context(cafile="es_cacert.pem")
-        ctx.check_hostname = False if ES_HOST == "localhost" else True
-        ctx.verify_mode = ssl.CERT_NONE if ES_HOST == "localhost" else ssl.CERT_REQUIRED
+    if not is_leader():
+        return
+        
+    ctx = ssl.create_default_context(cafile="es_cacert.pem")
+    ctx.check_hostname = False if ES_HOST == "localhost" else True
+    ctx.verify_mode = ssl.CERT_NONE if ES_HOST == "localhost" else ssl.CERT_REQUIRED
 
-        es = elasticsearch.Elasticsearch(
-            [ES_HOST], http_auth=("starbug", "PPwu7*Cq%H2JOEj2lE@O3423vVSNgybd"), scheme="https", ssl_context=ctx,
-        )
+    es = elasticsearch.Elasticsearch(
+        [ES_HOST], http_auth=("starbug", "PPwu7*Cq%H2JOEj2lE@O3423vVSNgybd"), scheme="https", ssl_context=ctx,
+    )
 
-        now = datetime.datetime.utcnow()
-        yesterday = (now - datetime.timedelta(days=1)).date()
+    now = datetime.datetime.utcnow()
+    yesterday = (now - datetime.timedelta(days=1)).date()
 
-        kube_cluster = "prod"
-        start_date = yesterday.strftime("%Y-%m-%dT00:00:00.000Z")
-        end_date = now.strftime("%Y-%m-%dT00:00:00.000Z")
+    kube_cluster = "prod"
+    start_date = yesterday.strftime("%Y-%m-%dT00:00:00.000Z")
+    end_date = now.strftime("%Y-%m-%dT00:00:00.000Z")
 
-        index_scan = elasticsearch.helpers.scan(
-            es,
-            index="nginx-*",
-            query={
-                "query": {
-                    "bool": {
-                        "must": [],
-                        "filter": [
-                            {
-                                "bool": {
-                                    "should": [
-                                        {"match": {"kubernetes.env.keyword": kube_cluster}},
-                                        {"match": {"nginx.http_user_agent": "Apache"}},
-                                    ],
-                                    "minimum_should_match": 2,
+    index_scan = elasticsearch.helpers.scan(
+        es,
+        index="nginx-*",
+        query={
+            "query": {
+                "bool": {
+                    "must": [],
+                    "filter": [
+                        {
+                            "bool": {
+                                "should": [
+                                    {"match": {"kubernetes.env.keyword": kube_cluster}},
+                                    {"match": {"nginx.http_user_agent": "Apache"}},
+                                ],
+                                "minimum_should_match": 2,
+                            }
+                        },
+                        {
+                            "range": {
+                                "@timestamp": {
+                                    "gte": start_date,
+                                    "lt": end_date,
+                                    "format": "strict_date_optional_time",
                                 }
-                            },
-                            {
-                                "range": {
-                                    "@timestamp": {
-                                        "gte": start_date,
-                                        "lt": end_date,
-                                        "format": "strict_date_optional_time",
-                                    }
-                                }
-                            },
-                        ],
-                        "should": [],
-                        "must_not": [],
-                    }
+                            }
+                        },
+                    ],
+                    "should": [],
+                    "must_not": [],
                 }
-            },
-        )
+            }
+        },
+    )
 
-        # Attempt to make tabes
-        logger.info("Connecting to api stats db")
-        with dest_db_apistats.connect() as conn:
-            logger.info("Creating tables")
-            meta.create_all()
-            logger.info("Insterting results")
+    # Attempt to make tabes
+    logger.info("Connecting to api stats db")
+    with dest_db_apistats.connect() as conn:
+        logger.info("Creating tables")
+        meta.create_all()
+        logger.info("Insterting results")
 
-            counter = 0
-            for item in index_scan:
-                data = item["_source"]
+        counter = 0
+        for item in index_scan:
+            data = item["_source"]
 
-                try:
-                    result = {
-                        "id": item["_id"],
-                        "date": dateutil.parser.parse(data["@timestamp"]),
-                        "method": data["nginx"]["method"],
-                        "host": data["nginx"]["vhost"],
-                        "path": data["nginx"]["path"],
-                        "status": data["nginx"]["status"],
-                        "response_time": data["nginx"]["upstream_response_time"],
-                        "user_agent": data["nginx"]["http_user_agent"],
-                    }
-                except Exception:
-                    continue
+            try:
+                result = {
+                    "id": item["_id"],
+                    "date": dateutil.parser.parse(data["@timestamp"]),
+                    "method": data["nginx"]["method"],
+                    "host": data["nginx"]["vhost"],
+                    "path": data["nginx"]["path"],
+                    "status": data["nginx"]["status"],
+                    "response_time": data["nginx"]["upstream_response_time"],
+                    "user_agent": data["nginx"]["http_user_agent"],
+                }
+            except Exception:
+                continue
 
-                stmt = stats_table.insert().values(**result)
-                try:
-                    conn.execute(stmt)
-                except Exception:
-                    pass
-                counter += 1
+            stmt = stats_table.insert().values(**result)
+            try:
+                conn.execute(stmt)
+            except Exception:
+                pass
+            counter += 1
 
-                if counter % 100 == 0:
-                    logger.info(f"Inserted {counter} values")
+            if counter % 100 == 0:
+                logger.info(f"Inserted {counter} values")
 
-            logger.info("Insterted results")
+        logger.info("Insterted results")
 
 
 def main() -> None:
