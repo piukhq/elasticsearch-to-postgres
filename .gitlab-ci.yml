@@ -7,7 +7,7 @@ black:
   stage: tests
   image: ghcr.io/binkhq/python:3.9
   before_script:
-    - pipenv install --system --deploy --ignore-pipfile
+    - pipenv install --dev --system --deploy --ignore-pipfile
   script:
     - black -l 120 -t py38 --check .
     - flake8 .
