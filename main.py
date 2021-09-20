@@ -128,9 +128,7 @@ def teams_notify(message):
         "Sections": [
             {
                 "activityTitle": "Database Sync Error",
-                "facts": [
-                    {"name": "Message", "value": message},
-                ],
+                "facts": [{"name": "Message", "value": message},],
                 "markdown": False,
             }
         ],
@@ -184,11 +182,7 @@ def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
             f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}",
         ]
 
-    p1 = subprocess.Popen(
-        sync_command,
-        stdout=subprocess.PIPE,
-        stderr=sys.stderr,
-    )
+    p1 = subprocess.Popen(sync_command, stdout=subprocess.PIPE, stderr=sys.stderr,)
     p2 = subprocess.Popen(
         (
             "pg_restore",
@@ -283,11 +277,7 @@ def dump_dd_stats() -> None:
                 "bool": {
                     "filter": {
                         "range": {
-                            "timestamp": {
-                                "gte": start_date,
-                                "lt": end_date,
-                                "format": "strict_date_optional_time",
-                            }
+                            "timestamp": {"gte": start_date, "lt": end_date, "format": "strict_date_optional_time",}
                         }
                     },
                 }
@@ -335,10 +325,7 @@ def dump_es_api_stats() -> None:
     ctx.verify_mode = ssl.CERT_NONE if ES_HOST == "localhost" else ssl.CERT_REQUIRED
 
     es = elasticsearch.Elasticsearch(
-        [ES_HOST],
-        http_auth=("starbug", "PPwu7*Cq%H2JOEj2lE@O3423vVSNgybd"),
-        scheme="https",
-        ssl_context=ctx,
+        [ES_HOST], http_auth=("starbug", "PPwu7*Cq%H2JOEj2lE@O3423vVSNgybd"), scheme="https", ssl_context=ctx,
     )
 
     now = datetime.datetime.utcnow()
