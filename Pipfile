@@ -1,0 +1,24 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+apscheduler = "*"
+pylogrus = "*"
+elasticsearch = "*"
+sqlalchemy = "*"
+python-dateutil = "*"
+redis = "*"
+psycopg2-binary = "*"
+
+[dev-packages]
+black = "==21.6b0"
+flake8 = "*"
+mypy = "*"
+pytest = "*"
+ptpython = "*"
+xenon = "*"
+
+[requires]
+python_version = "3.9"

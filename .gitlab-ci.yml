@@ -5,11 +5,12 @@ stages:
 
 black:
   stage: tests
-  image: python:3.9
+  image: ghcr.io/binkhq/python:3.9
+  before_script:
+    - pipenv install --system --deploy --ignore-pipfile
   script:
-    - pip3 install poetry
-    - poetry install
-    - poetry run black -l 120 -t py38 --check .
+    - black -l 120 -t py38 --check .
+    - flake8 .
 
 build-develop:
   stage: build
@@ -18,9 +19,10 @@ build-develop:
     - docker:dind
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - export CTAG=$(echo -n "$CI_PIPELINE_CREATED_AT" | sed s/\://g)
   script:
-    - docker build --pull -t "$CI_REGISTRY/postgres-syncer:latest" .
-    - docker push "$CI_REGISTRY/postgres-syncer:latest"
+    - docker build --pull --tag "$CI_REGISTRY/postgres-syncer:$CTAG" .
+    - docker push "$CI_REGISTRY/postgres-syncer:$CTAG"
   only:
     - master
 
@@ -30,6 +32,6 @@ tag-develop:
   before_script:
     - export CTAG=$(echo -n "$CI_PIPELINE_CREATED_AT" | sed s/\://g)
   script:
-    - tagbot --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" --source "$CI_REGISTRY/postgres-syncer:latest" --tag "develop-$CTAG"
+    - tagbot --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" --source "$CI_REGISTRY/postgres-syncer:$CTAG" --tag "latest"
   only:
     - master
