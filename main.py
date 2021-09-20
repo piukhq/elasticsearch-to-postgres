@@ -7,9 +7,11 @@ import datetime
 import os
 import logging
 import re
+import redis
 import subprocess
 import ssl
 import sys
+import socket
 import time
 import requests
 from typing import cast
@@ -35,6 +37,9 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 logging.setLoggerClass(pylogrus.PyLogrus)
+
+# Leader Election
+redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 SOURCE_DB_HOST = os.environ["SOURCE_DB_HOST"]
 SOURCE_DB_PORT = int(os.environ.get("SOURCE_DB_PORT", "5432"))
@@ -89,6 +94,26 @@ dd_stats_table = Table(
     Column("error", Boolean),
     Column("total_time", Float),
 )
+
+
+def is_leader():
+    r = redis.Redis.from_url(redis_url)
+    lock_key = "harmonia-reporter-lock"
+    hostname = socket.gethostname()
+    is_leader = False
+
+    with r.pipeline() as pipe:
+        try:
+            pipe.watch(lock_key)
+            leader_host = pipe.get(lock_key)
+            if leader_host in (hostname.encode(), None):
+                pipe.multi()
+                pipe.setex(lock_key, 60, hostname)
+                pipe.execute()
+                is_leader = True
+        except redis.WatchError:
+            pass
+    return is_leader
 
 
 def teams_notify(message):
@@ -201,6 +226,9 @@ def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
 
 
 def dump_tables() -> None:
+    if not is_leader():
+        return
+
     logger.info("Syncing databases")
 
     conn = None
@@ -236,6 +264,9 @@ def dump_tables() -> None:
 
 
 def dump_dd_stats() -> None:
+    if not is_leader():
+        return
+
     es = elasticsearch.Elasticsearch(["starbug-elasticsearch"])
     # es = elasticsearch.Elasticsearch(["localhost"])
 
@@ -296,6 +327,9 @@ def dump_dd_stats() -> None:
 
 
 def dump_es_api_stats() -> None:
+    if not is_leader():
+        return
+
     ctx = ssl.create_default_context(cafile="es_cacert.pem")
     ctx.check_hostname = False if ES_HOST == "localhost" else True
     ctx.verify_mode = ssl.CERT_NONE if ES_HOST == "localhost" else ssl.CERT_REQUIRED
