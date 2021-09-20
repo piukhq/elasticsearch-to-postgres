@@ -57,8 +57,8 @@ LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 DB_SYNC_TIMEOUT = int(os.environ.get("DB_SYNC_TIMEOUT", "21600"))
 ACCEPTABLE_DB_REGEX = re.compile(r"[a-z]+")
 
-KILL_CONN_SQL = """SELECT pg_terminate_backend(pid) 
-FROM pg_stat_activity 
+KILL_CONN_SQL = """SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
 WHERE pid <> pg_backend_pid()
 AND datname IN ({0});"""
 
@@ -129,7 +129,9 @@ def teams_notify(message):
         "Sections": [
             {
                 "activityTitle": "Database Sync Error",
-                "facts": [{"name": "Message", "value": message},],
+                "facts": [
+                    {"name": "Message", "value": message},
+                ],
                 "markdown": False,
             }
         ],
@@ -158,7 +160,7 @@ def drop_create_db(cursor, dbname: str) -> None:
     logger.withFields({"dbname": dbname}).info("Dropping and creating database")
     cursor.execute(DROP_DB_SQL.format(dbname))
     cursor.execute(CREATE_DB_SQL.format(dbname))
-    logger.withFields({"dbname": dbname}).info(f"Dropped and created database")
+    logger.withFields({"dbname": dbname}).info("Dropped and created database")
 
 
 def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
@@ -183,7 +185,11 @@ def sync_data(dbname: str, dbuser: str, timeout: int = DB_SYNC_TIMEOUT) -> bool:
             f"host={SOURCE_DB_HOST} port={SOURCE_DB_PORT} dbname={dbname} user={dbuser}",
         ]
 
-    p1 = subprocess.Popen(sync_command, stdout=subprocess.PIPE, stderr=sys.stderr,)
+    p1 = subprocess.Popen(
+        sync_command,
+        stdout=subprocess.PIPE,
+        stderr=sys.stderr,
+    )
     p2 = subprocess.Popen(
         (
             "pg_restore",
@@ -284,7 +290,11 @@ def dump_dd_stats() -> None:
                 "bool": {
                     "filter": {
                         "range": {
-                            "timestamp": {"gte": start_date, "lt": end_date, "format": "strict_date_optional_time",}
+                            "timestamp": {
+                                "gte": start_date,
+                                "lt": end_date,
+                                "format": "strict_date_optional_time",
+                            }
                         }
                     },
                 }
@@ -335,7 +345,10 @@ def dump_es_api_stats() -> None:
     ctx.verify_mode = ssl.CERT_NONE if ES_HOST == "localhost" else ssl.CERT_REQUIRED
 
     es = elasticsearch.Elasticsearch(
-        [ES_HOST], http_auth=("starbug", "PPwu7*Cq%H2JOEj2lE@O3423vVSNgybd"), scheme="https", ssl_context=ctx,
+        [ES_HOST],
+        http_auth=("starbug", "PPwu7*Cq%H2JOEj2lE@O3423vVSNgybd"),
+        scheme="https",
+        ssl_context=ctx,
     )
 
     now = datetime.datetime.utcnow()
@@ -442,7 +455,7 @@ def main() -> None:
         sys.exit(1)
     for db in SOURCE_DBS:
         if not ACCEPTABLE_DB_REGEX.match(db):
-            logger.withFields({"dbname": db}).critical(f"DB not an acceptable db name")
+            logger.withFields({"dbname": db}).critical("DB not an acceptable db name")
             sys.exit(1)
 
     if DEST_DB_PASSWORD:
