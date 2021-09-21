@@ -251,7 +251,7 @@ def dump_tables() -> None:
                     kick_users(cur)
                 with conn.cursor() as cur:
                     drop_create_db(cur, db)
-                if sync_data(db, dbuser) and attempt > 0:
+                if attempt > 0 and sync_data(db, dbuser):
                     teams_notify(db + "database sync succeeded on retry")
                     break
                 elif sync_data(db, dbuser):
@@ -267,73 +267,6 @@ def dump_tables() -> None:
             drop_hashes(cur)
 
     logger.info("Finished syncing databases")
-
-
-def dump_dd_stats() -> None:
-    if not is_leader():
-        return
-
-    es = elasticsearch.Elasticsearch(["starbug-elasticsearch"])
-    # es = elasticsearch.Elasticsearch(["localhost"])
-
-    now = datetime.datetime.utcnow()
-    yesterday = (now - datetime.timedelta(days=1)).date()
-
-    start_date = yesterday.strftime("%Y-%m-%dT00:00:00.000Z")
-    end_date = now.strftime("%Y-%m-%dT00:00:00.000Z")
-
-    index_scan = elasticsearch.helpers.scan(
-        es,
-        index="synthetics",
-        query={
-            "query": {
-                "bool": {
-                    "filter": {
-                        "range": {
-                            "timestamp": {
-                                "gte": start_date,
-                                "lt": end_date,
-                                "format": "strict_date_optional_time",
-                            }
-                        }
-                    },
-                }
-            }
-        },
-    )
-
-    # Attempt to make tabes
-    logger.info("Connecting to dd stats db")
-    with dest_db_apistats.connect() as conn:
-        logger.info("Creating tables")
-        meta.create_all()
-        logger.info("Insterting results")
-        counter = 0
-        for item in index_scan:
-            data = item["_source"]
-
-            try:
-                result = {
-                    "id": item["_id"],
-                    "date": dateutil.parser.parse(data["timestamp"]),
-                    "url": data["url"],
-                    "error": False if not data["error"] else True,
-                    "total_time": data["total"],
-                }
-            except Exception:
-                continue
-
-            stmt = dd_stats_table.insert().values(**result)
-            try:
-                conn.execute(stmt)
-            except Exception:
-                pass
-            counter += 1
-
-            if counter % 100 == 0:
-                logger.info(f"Inserted {counter} values")
-
-        logger.info("Insterted results")
 
 
 def dump_es_api_stats() -> None:
@@ -444,7 +377,6 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--now", action="store_true", help="Run database sync now")
     parser.add_argument("--es", action="store_true", help="Run elasticsearch dump now")
-    parser.add_argument("--es-dd", action="store_true", help="Run elasticsearch dump now")
     args = parser.parse_args()
 
     if SOURCE_DB_HOST == DEST_DB_HOST and SOURCE_DB_PORT == DEST_DB_PORT:
@@ -471,13 +403,10 @@ def main() -> None:
         dump_tables()
     elif args.es:
         dump_es_api_stats()
-    elif args.es_dd:
-        dump_dd_stats()
     else:
         scheduler = BlockingScheduler()
         scheduler.add_job(dump_tables, trigger=CronTrigger.from_crontab("0 4 * * *"))
         scheduler.add_job(dump_es_api_stats, trigger=CronTrigger.from_crontab("0 1 * * *"))
-        scheduler.add_job(dump_dd_stats, trigger=CronTrigger.from_crontab("0 3 * * *"))
         scheduler.start()
 
 
