@@ -14,12 +14,13 @@ psycopg2-binary = "*"
 requests = "*"
 
 [dev-packages]
-black = "==21.6b0"
+black = "==21.10b0"
 flake8 = "*"
 mypy = "*"
 pytest = "*"
 ptpython = "*"
 xenon = "*"
+isort = "*"
 
 [requires]
 python_version = "3.9"

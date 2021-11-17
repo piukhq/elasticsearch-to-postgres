@@ -4,37 +4,26 @@ Syncs databases from one postgres to another
 """
 import argparse
 import datetime
-import os
 import logging
+import os
 import re
-import redis
-import subprocess
-import ssl
-import sys
 import socket
+import ssl
+import subprocess
+import sys
 import time
-import requests
 from typing import cast
 
 import dateutil.parser
 import elasticsearch
+import elasticsearch.helpers
 import psycopg2
 import pylogrus
-import elasticsearch.helpers
-from sqlalchemy import (
-    create_engine,
-    Table,
-    Column,
-    String,
-    MetaData,
-    Date,
-    Integer,
-    Float,
-    Boolean,
-    DateTime,
-)
-from apscheduler.triggers.cron import CronTrigger
+import redis
+import requests
 from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, Integer, MetaData, String, Table, create_engine
 
 logging.setLoggerClass(pylogrus.PyLogrus)
 
@@ -375,7 +364,6 @@ def main() -> None:
     logger.info("Started postgres syncer")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--now", action="store_true", help="Run database sync now")
     parser.add_argument("--es", action="store_true", help="Run elasticsearch dump now")
     args = parser.parse_args()
 
@@ -399,13 +387,10 @@ def main() -> None:
     logger.withFields({"host": SOURCE_DB_HOST, "port": SOURCE_DB_PORT, "databases": SOURCE_DBS}).info("Source DB Info")
     logger.withFields({"host": DEST_DB_HOST, "port": DEST_DB_PORT, "user": DEST_DB_USER}).info("Destination DB Info")
 
-    if args.now:
-        dump_tables()
-    elif args.es:
+    if args.es:
         dump_es_api_stats()
     else:
         scheduler = BlockingScheduler()
-        scheduler.add_job(dump_tables, trigger=CronTrigger.from_crontab("0 4 * * *"))
         scheduler.add_job(dump_es_api_stats, trigger=CronTrigger.from_crontab("0 1 * * *"))
         scheduler.start()
 
