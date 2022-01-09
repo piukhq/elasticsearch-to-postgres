@@ -5,13 +5,14 @@ name = "pypi"
 
 [packages]
 apscheduler = "*"
-pylogrus = "*"
-elasticsearch = "*"
+elasticsearch = "<7.0.0"
 sqlalchemy = "*"
 python-dateutil = "*"
 redis = "*"
 psycopg2-binary = "*"
 requests = "*"
+pydantic = "*"
+python-json-logger = "*"
 
 [dev-packages]
 black = "==21.10b0"

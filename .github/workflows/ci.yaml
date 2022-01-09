@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.9"
+      - run: pip install pipenv
+      - run: pipenv install --dev --system --deploy --ignore-pipfile
+      - run: flake8 .
+      - run: black --line-length=120 --check .
+      - run: isort --check --line-length 120 --profile black .
+  create_release:
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    name: create_dev_release
+    runs-on: ubuntu-latest
+    needs: [ tests ]
+    steps:
+      - uses: actions/checkout@v2
+      - run: echo "::set-output name=date::$(date +'%FT%H%M%SZ')"
+        id: date
+      - uses: docker/login-action@v1
+        with:
+          registry: binkcore.azurecr.io
+          username: binkcore
+          password: ${{ secrets.ACR_BINKCORE_PASSWORD }}
+      - uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: |
+            binkcore.azurecr.io/elasticsearch-to-postgres:${{ steps.date.outputs.date }}
+            binkcore.azurecr.io/elasticsearch-to-postgres:latest
